@@ -28,6 +28,7 @@ namespace PRoConEvents
 
         private string kickMessage = "";
         private string chatMessage = "";
+        private Boolean initialSet = false;
 
         private List<command> commandList = new List<command>();
 
@@ -36,18 +37,30 @@ namespace PRoConEvents
             private string cmd = "";
             private string response = "";
             private pureWords2 pw2 = null;
+            //Default Prefixes
+            private List<char> prefixesList = new List<char>(new char[] { '!', '/' });
 
             public command()
             {
                 cmd = "";
                 response = "";
                 pw2 = null;
+                //Default Prefixes
+                prefixesList = new List<char>(new char[] { '!','/' });
             }
-            public command(pureWords2 instance, String cmdString, String responseString)
+            public command(pureWords2 instance, String cmdString, String prefixesString, String responseString)
             {
                 pw2 = instance;
                 setCommand(cmdString);
                 setResponse(responseString);
+                if (!String.IsNullOrEmpty(prefixesString))
+                {
+                    setPrefixes(prefixesString);
+                }
+                else //Default Prefixes
+                {
+                    setPrefixes("!/");
+                }
             }
             public void setCommand(String cmdString)
             {
@@ -57,6 +70,21 @@ namespace PRoConEvents
             {
                 return cmd;
             }
+            public void setPrefixes(String prefixString)
+            {
+                pw2.toConsole(3, "DEBUG: Setting prefixes to " + prefixString);
+                prefixesList.Clear();
+                prefixesList = new List<char>(prefixString.ToCharArray());
+            }
+            public String getPrefixes()
+            {
+                String prefixesListString = "";
+                foreach (char c in prefixesList)
+                {
+                    prefixesListString += c.ToString();
+                }
+                return prefixesListString;
+            }
             public void setResponse(String responseString)
             {
                 response = responseString.Replace("\r", "").Trim();
@@ -65,18 +93,23 @@ namespace PRoConEvents
             {
                 return response;
             }
-            public void checkChatAndRespond(String chatMsg, String playerName)
+            public Boolean checkChatAndRespond(String playerName, String chatMsg)
             {
                 String message = chatMsg;
                 pw2.toConsole(3, "First character is " + message[0].ToString());
-                if ((message[0].ToString() == "!" || message[0].ToString() == "/") && message.Trim().Length > 1 && !String.IsNullOrEmpty(this.getResponse()) && !String.IsNullOrEmpty(this.getCommand()))
+                if (message.Trim().Length > 1 && !String.IsNullOrEmpty(this.getResponse()) && !String.IsNullOrEmpty(this.getCommand()) && prefixesList.Count > 0)
                 {
                     String cmdBody = message.Substring(1).ToLower();
-                    if (cmdBody == this.getCommand())
+                    foreach (char k in prefixesList)
                     {
-                        pw2.toChat(chatMsg, playerName);
+                        if (message[0] == k && cmdBody == this.getCommand())
+                        {
+                            pw2.toChat(this.getResponse(), playerName);
+                            return true;
+                        }
                     }
                 }
+                return false;
             }
         }
         private string debugLevelString = "1";
@@ -109,6 +142,19 @@ namespace PRoConEvents
                 else
                 {
                     toConsole(2, "No bad words...");
+                    Boolean wasCommand = false;
+                    foreach (command aCmd in commandList)
+                    {
+                        if (aCmd.checkChatAndRespond(speaker, message))
+                        {
+                            wasCommand = true;
+                            break;
+                        }
+                    }
+                    if (!wasCommand)
+                    {
+                        toConsole(2, "Was not a command...");
+                    }
                 }
             }
         }
@@ -125,7 +171,7 @@ namespace PRoConEvents
 
         public string GetPluginVersion()
         {
-            return "0.1.1";
+            return "0.5.2";
         }
 
         public string GetPluginAuthor()
@@ -137,7 +183,7 @@ namespace PRoConEvents
         {
             return "purebattlefield.org";
         }
-
+        #region Description
         public string GetPluginDescription()
         {
             return @"<p><b>This version of pureWords that contains a special
@@ -231,7 +277,7 @@ include customizable starting characters like '#' or '@'.</p>
 
 ";
         }
-
+        #endregion
         //--------------------------------------
         //Helper Functions
         //--------------------------------------
@@ -273,7 +319,7 @@ include customizable starting characters like '#' or '@'.</p>
             //a message with msgLevel 1 is more important than 2
             if (debugLevel >= msgLevel)
             {
-                this.ExecuteCommand("procon.protected.pluginconsole.write", "pureWords: " + message);
+                this.ExecuteCommand("procon.protected.pluginconsole.write", "pureWords2: " + message);
             }
         }
 
@@ -305,7 +351,7 @@ include customizable starting characters like '#' or '@'.</p>
         }
 
         //--------------------------------------
-        //Handy pureWords Methods
+        //Handy pureWords2 Methods
         //--------------------------------------
 
         public Boolean containsBadWords(String chatMessage)
@@ -338,15 +384,10 @@ include customizable starting characters like '#' or '@'.</p>
         {
             this.ExecuteCommand("procon.protected.send", "admin.kickPlayer", playerName, this.kickMessage);
         }
-
-        //--------------------------------------
-        //These methods run when Procon does what's on the label.
-
+        #region Chat Events
         public void OnPluginLoaded(string strHostName, string strPort, string strPRoConVersion)
         {
-            // Depending on your plugin you will need different types of events. See other plugins for examples.
             this.RegisterEvents(this.GetType().Name, "OnPluginLoaded", "OnGlobalChat", "OnTeamChat", "OnSquadChat");
-            //triggerArray
         }
 
         public override void OnGlobalChat(string speaker, string message)
@@ -363,11 +404,11 @@ include customizable starting characters like '#' or '@'.</p>
         {
             processChat(speaker, message);
         }
-
+        #endregion
         public void OnPluginEnable()
         {
             this.pluginEnabled = true;
-            this.toConsole(1, "pureWords Enabled!");
+            this.toConsole(1, "pureWords2 Enabled!");
             string stringKeywordList = "";
             foreach (string keyword in keywordArray)
             {
@@ -375,14 +416,14 @@ include customizable starting characters like '#' or '@'.</p>
             }
             keywordArraySize = keywordArray.Length;
             this.toConsole(2, "Keyword List (" + keywordArraySize + " words): " + stringKeywordList);
-            toLog("[STATUS] pureWords Enabled");
+            toLog("[STATUS] pureWords2 Enabled");
         }
 
         public void OnPluginDisable()
         {
             this.pluginEnabled = false;
-            toLog("[STATUS] pureWords Disabled");
-            this.toConsole(1, "pureWords Disabled!");
+            toLog("[STATUS] pureWords2 Disabled");
+            this.toConsole(1, "pureWords2 Disabled!");
         }
 
         public List<CPluginVariable> GetDisplayPluginVariables()
@@ -394,7 +435,7 @@ include customizable starting characters like '#' or '@'.</p>
                 lstReturn.Add(new CPluginVariable("Main Settings|Debug Level", typeof(string), debugLevelString));
                 lstReturn.Add(new CPluginVariable("Filter Settings|Bad Word List", typeof(string), keywordListString));
                 lstReturn.Add(new CPluginVariable("Filter Settings|Kick Message", typeof(string), kickMessage));
-                lstReturn.Add(new CPluginVariable("Filter Settings|Chat Message", typeof(string), chatMessage));
+                lstReturn.Add(new CPluginVariable("Filter Settings|Admin Chat Message", typeof(string), chatMessage));
                 lstReturn.Add(new CPluginVariable("Command Settings|New Command Word", typeof(string), ""));
 
                 //foreach (command m in commandList)
@@ -404,8 +445,10 @@ include customizable starting characters like '#' or '@'.</p>
                 {
                     command thisCommand = commandList[i];
                     String commandWordAdd = thisCommand.getCommand();
+                    String prefixesAdd = thisCommand.getPrefixes();
                     String responseAdd = thisCommand.getResponse();
-                    if (String.IsNullOrEmpty(commandWordAdd) && String.IsNullOrEmpty(responseAdd))
+                    //Default prefixes
+                    if (String.IsNullOrEmpty(commandWordAdd) && String.IsNullOrEmpty(responseAdd) && (String.IsNullOrEmpty(prefixesAdd) || prefixesAdd == "!/") && initialSet == true)
                     {
                         commandList.Remove(thisCommand);
                         i--;
@@ -413,6 +456,7 @@ include customizable starting characters like '#' or '@'.</p>
                     else
                     {
                         lstReturn.Add(new CPluginVariable("Command Settings|Command Word " + i.ToString(), typeof(string), commandWordAdd));
+                        lstReturn.Add(new CPluginVariable("Command Settings|Command Prefixes " + i.ToString(), typeof(string), prefixesAdd));
                         lstReturn.Add(new CPluginVariable("Command Settings|Command Response " + i.ToString(), typeof(string), responseAdd));
                     }
                 }
@@ -422,7 +466,6 @@ include customizable starting characters like '#' or '@'.</p>
             {
                 toConsole(1, e.ToString());
             }
-
 
             return lstReturn;
         }
@@ -434,7 +477,9 @@ include customizable starting characters like '#' or '@'.</p>
 
         public void SetPluginVariable(String strVariable, String strValue)
         {
-            if (Regex.Match(strVariable, @"Bad Word List").Success)
+            initialSet = true;
+            toConsole(3, "DEBUG: Setting '" + strVariable + "' with value '" + strValue + "'");
+            if (strVariable.Contains("Bad Word List"))
             {
                 //keywordListString = strValue;
                 if (String.IsNullOrEmpty(strValue))
@@ -460,35 +505,74 @@ include customizable starting characters like '#' or '@'.</p>
                     this.toConsole(1, "Keyword List Updated (" + keywordArraySize + " words): " + stringKeywordList);
                 }
             }
-            else if (Regex.Match(strVariable, @"Kick Message").Success)
+            else if (strVariable.Contains("Kick Message"))
             {
                 kickMessage = removeCReturn(strValue);
             }
-            else if (Regex.Match(strVariable, @"Chat Message").Success)
+            else if (strVariable.Contains("Admin Chat Message"))
             {
                 chatMessage = removeCReturn(strValue);
             }
-            else if (Regex.Match(strVariable, @"Log Path").Success)
+            else if (strVariable.Contains("Log Path"))
             {
                 logName = strValue.Trim();
+                if(pluginEnabled)
+                    toLog("[STATUS] Log path set to " + logName);
                 //StreamWriter log = File.AppendText(logName);
             }
             else if (Regex.Match(strVariable, @"New Command Word").Success)
             {
-                commandList.Add(new command(this, strValue, ""));
+                commandList.Add(new command(this, strValue, "", ""));
                 //StreamWriter log = File.AppendText(logName);
             }
             else if (Regex.Match(strVariable, @"Command Word").Success)
             {
                 String[] strVariableArray = strVariable.Split(' ');
                 int cmdNum = Convert.ToInt32(strVariableArray[strVariableArray.Length - 1]);
-                commandList[cmdNum].setCommand(strValue);
+                try
+                {
+                    if (commandList[cmdNum].GetType() != typeof(command) || commandList[cmdNum] == null)
+                        commandList[cmdNum] = new command(this, strValue, "", "");
+                    commandList[cmdNum].setCommand(strValue);
+                }
+                catch (ArgumentOutOfRangeException e)
+                {
+                    toConsole(3, e.ToString());
+                    commandList.Add(new command(this, strValue, "", ""));
+                }
+            }
+            else if (Regex.Match(strVariable, @"Command Prefixes").Success)
+            {
+                String[] strVariableArray = strVariable.Split(' ');
+                int cmdNum = Convert.ToInt32(strVariableArray[strVariableArray.Length - 1]);
+                try
+                {
+                    if (commandList[cmdNum].GetType() != typeof(command) || commandList[cmdNum] == null)
+                        commandList[cmdNum] = new command(this, "", strValue, "");
+                    commandList[cmdNum].setPrefixes(strValue);
+                }
+                catch (ArgumentOutOfRangeException e)
+                {
+                    toConsole(3, e.ToString());
+                    commandList.Add(new command(this, "", strValue, ""));
+                    //commandList[cmdNum].setPrefixes(strValue);
+                }
             }
             else if (Regex.Match(strVariable, @"Command Response").Success)
             {
                 String[] strVariableArray = strVariable.Split(' ');
                 int cmdNum = Convert.ToInt32(strVariableArray[strVariableArray.Length - 1]);
-                commandList[cmdNum].setResponse(strValue);
+                try
+                {
+                    if (commandList[cmdNum].GetType() != typeof(command) || commandList[cmdNum] == null)
+                        commandList[cmdNum] = new command(this, "", "", strValue);
+                    commandList[cmdNum].setResponse(strValue);
+                }
+                catch (ArgumentOutOfRangeException e)
+                {
+                    toConsole(3, e.ToString());
+                    commandList.Add(new command(this, "", "", strValue));
+                }
             }
             else if (Regex.Match(strVariable, @"Debug Level").Success)
             {
@@ -499,7 +583,7 @@ include customizable starting characters like '#' or '@'.</p>
                 }
                 catch (Exception z)
                 {
-                    toConsole(1, "Invalid debug level! Choose 0, 1, or 2 only.");
+                    toConsole(1, "Invalid debug level! Use integer values only.");
                     debugLevel = 1;
                     debugLevelString = "1";
                 }
