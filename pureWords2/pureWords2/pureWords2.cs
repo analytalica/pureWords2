@@ -171,7 +171,7 @@ namespace PRoConEvents
 
         public string GetPluginVersion()
         {
-            return "0.5.2";
+            return "0.5.3";
         }
 
         public string GetPluginAuthor()
@@ -437,9 +437,10 @@ include customizable starting characters like '#' or '@'.</p>
                 lstReturn.Add(new CPluginVariable("Filter Settings|Kick Message", typeof(string), kickMessage));
                 lstReturn.Add(new CPluginVariable("Filter Settings|Admin Chat Message", typeof(string), chatMessage));
                 lstReturn.Add(new CPluginVariable("Command Settings|New Command Word", typeof(string), ""));
-
-                //foreach (command m in commandList)
-                //    lstReturn.AddRange(m.getVariables());
+				
+				if(commandList.Count > 0){
+					lstReturn.Add(new CPluginVariable("Command Settings|Copy Existing Command", typeof(string), ""));
+				}
 
                 for (int i = 0; i < commandList.Count; i++)
                 {
@@ -520,11 +521,30 @@ include customizable starting characters like '#' or '@'.</p>
                     toLog("[STATUS] Log path set to " + logName);
                 //StreamWriter log = File.AppendText(logName);
             }
-            else if (Regex.Match(strVariable, @"New Command Word").Success)
+            else if (strVariable.Contains("New Command Word"))
             {
                 commandList.Add(new command(this, strValue, "", ""));
                 //StreamWriter log = File.AppendText(logName);
             }
+			else if (strVariable.Contains("Copy Existing Command"))
+			{
+				int cmdToCopy = 0;
+				try
+                {
+                    cmdToCopy = Int32.Parse(strValue);
+					if(cmdToCopy + 1 > commandList.Count)
+					{
+						toConsole(1, "ERROR: That command doesn't exist!")
+					}else{
+						//Need a better cloning function
+						commandList.Insert(cmdToCopy + 1, new command(this, commandList[cmdToCopy].getCommand(), commandList[cmdToCopy].getPrefixes(), commandList[cmdToCopy].getResponse());
+					}
+                }
+                catch (Exception z)
+                {
+                    toConsole(1, "ERROR: Invalid command ID! Use integer values only.");
+                }
+			}
             else if (Regex.Match(strVariable, @"Command Word").Success)
             {
                 String[] strVariableArray = strVariable.Split(' ');
