@@ -392,17 +392,17 @@ include customizable starting characters like '#' or '@'.</p>
 
         public override void OnGlobalChat(string speaker, string message)
         {
-            processChat(speaker, message);
+            processChat(speaker, message.ToLower());
         }
 
         public override void OnTeamChat(string speaker, string message, int teamId)
         {
-            processChat(speaker, message);
+            processChat(speaker, message.ToLower());
         }
 
         public override void OnSquadChat(string speaker, string message, int teamId, int squadId)
         {
-            processChat(speaker, message);
+            processChat(speaker, message.ToLower());
         }
         #endregion
         public void OnPluginEnable()
