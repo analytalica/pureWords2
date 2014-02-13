@@ -35,38 +35,64 @@ namespace PRoConEvents
         private class command
         {
             //private string cmd = "";
-            public string cmd
+            private string i_commandWord = "";
+            public string commandWord
             {
-                get { return cmd; }
-                set { cmd = value.Trim().ToLower(); }
+                get { return i_commandWord; }
+                set { i_commandWord = value.Trim().ToLower(); }
             }
-            private string response = "";
-            private pureWords2 pw2 = null;
+
+            private string i_response = "";
+            public string response
+            {
+                get { return i_response; }
+                set { i_response = value.Replace("\r", "").Trim(); }
+            }
+
             //Default Prefixes
-            private List<char> prefixesList = new List<char>(new char[] { '!', '/' });
-            private int broacastLevel = 1;
+            private List<char> i_prefixes = new List<char>(new char[] { '!', '/' });
+            public string prefixes
+            {
+                get
+                {
+                    String prefixesListString = "";
+                    foreach (char c in i_prefixes)
+                    {
+                        prefixesListString += c.ToString();
+                    }
+                    return prefixesListString;
+                }
+                set
+                {
+                    i_prefixes.Clear();
+                    i_prefixes = new List<char>(value.ToCharArray());
+                }
+            }
+
+            private pureWords2 pw2 = null;
+            public int broacastLevel { get; set; }
 
             public command()
             {
-                cmd = "";
+                commandWord = "";
                 response = "";
                 pw2 = null;
                 //Default Prefixes
-                prefixesList = new List<char>(new char[] { '!','/' });
+                prefixes = "!/";
                 broacastLevel = 1;
             }
             public command(pureWords2 instance, String cmdString, String prefixesString, String responseString, int broadcast)
             {
                 pw2 = instance;
-                setCommand(cmdString);
-                setResponse(responseString);
+                commandWord = cmdString;
+                response = responseString;
                 if (!String.IsNullOrEmpty(prefixesString))
                 {
-                    setPrefixes(prefixesString);
+                    prefixes = prefixesString;
                 }
                 else //Default Prefixes
                 {
-                    setPrefixes("!/");
+                    prefixes = "!/";
                 }
             }
             /*public void setCommand(String cmdString)
@@ -77,7 +103,7 @@ namespace PRoConEvents
             {
                 return cmd;
             }*/
-            public void setPrefixes(String prefixString)
+            /*public void setPrefixes(String prefixString)
             {
                 pw2.toConsole(3, "DEBUG: Setting prefixes to " + prefixString);
                 prefixesList.Clear();
@@ -99,27 +125,19 @@ namespace PRoConEvents
             public String getResponse()
             {
                 return response;
-            }
-            public void setBroadcast(int broadcast)
-            {
-                broacastLevel = broadcast;
-            }
-            public int getBroadcast()
-            {
-                return broacastLevel;
-            }
+            }*/
             public Boolean checkChatAndRespond(String playerName, String chatMsg)
             {
                 String message = chatMsg;
                 pw2.toConsole(3, "First character is " + message[0].ToString());
-                if (message.Trim().Length > 1 && !String.IsNullOrEmpty(this.getResponse()) && !String.IsNullOrEmpty(this.getCommand()) && prefixesList.Count > 0)
+                if (message.Trim().Length > 1 && !String.IsNullOrEmpty(this.response) && !String.IsNullOrEmpty(this.commandWord) && this.i_prefixes.Count > 0)
                 {
                     String cmdBody = message.Substring(1).ToLower();
-                    foreach (char k in prefixesList)
+                    foreach (char k in i_prefixes)
                     {
-                        if (message[0] == k && cmdBody == this.getCommand())
+                        if (message[0] == k && cmdBody == this.commandWord)
                         {
-                            pw2.toChat(this.getResponse(), playerName);
+                            pw2.toChat(this.response, playerName);
                             return true;
                         }
                     }
@@ -187,7 +205,7 @@ namespace PRoConEvents
 
         public string GetPluginVersion()
         {
-            return "0.5.7";
+            return "0.6.3";
         }
 
         public string GetPluginAuthor()
@@ -459,9 +477,9 @@ include customizable starting characters like '#' or '@'.</p>
                 for (int i = 0; i < commandList.Count; i++)
                 {
                     command thisCommand = commandList[i];
-                    String commandWordAdd = thisCommand.getCommand();
-                    String prefixesAdd = thisCommand.getPrefixes();
-                    String responseAdd = thisCommand.getResponse();
+                    String commandWordAdd = thisCommand.commandWord;
+                    String prefixesAdd = thisCommand.prefixes;
+                    String responseAdd = thisCommand.response;
                     //Default prefixes
                     if (String.IsNullOrEmpty(commandWordAdd) && String.IsNullOrEmpty(responseAdd) && (String.IsNullOrEmpty(prefixesAdd) || prefixesAdd == "!/") && initialSet == true)
                     {
@@ -504,8 +522,7 @@ include customizable starting characters like '#' or '@'.</p>
                 }
                 else
                 {
-                    string replaceWith = "";
-                    keywordListString = strValue.Replace("\r\n", replaceWith).Replace("\n", replaceWith).Replace("\r", replaceWith);
+                    keywordListString = strValue.Replace("\r\n", "").Replace("\n", "").Replace("\r", "");
                     keywordArray = keywordListString.Split(',');
                     keywordArraySize = keywordArray.Length;
                     for (int i = 0; i < keywordArraySize; i++)
@@ -537,7 +554,7 @@ include customizable starting characters like '#' or '@'.</p>
             }
             else if (strVariable.Contains("New Command Word"))
             {
-                commandList.Add(new command(this, strValue, "", ""));
+                commandList.Add(new command(this, strValue, "", "", 1));
                 //StreamWriter log = File.AppendText(logName);
             }
 			else if (strVariable.Contains("Copy Existing Command"))
@@ -565,53 +582,53 @@ include customizable starting characters like '#' or '@'.</p>
             else if (strVariable.Contains("Command Word"))
             {
                 String[] strVariableArray = strVariable.Split(' ');
-                int cmdNum = Convert.ToInt32(strVariableArray[strVariableArray.Length - 1]);
+                int n = Convert.ToInt32(strVariableArray[strVariableArray.Length - 1]);
                 try
                 {
-                    if (commandList[cmdNum].GetType() != typeof(command) || commandList[cmdNum] == null)
-                        commandList[cmdNum] = new command(this, strValue, "", "");
-                    commandList[cmdNum].setCommand(strValue);
+                    if (commandList[n].GetType() != typeof(command) || commandList[n] == null)
+                        commandList[n] = new command(this, strValue, "", "", 1);
+                    commandList[n].commandWord = strValue;
                 }
                 catch (ArgumentOutOfRangeException e)
                 {
                     toConsole(3, e.ToString());
-                    commandList.Add(new command(this, strValue, "", ""));
+                    commandList.Add(new command(this, strValue, "", "", 1));
                 }
             }
-            else if (Regex.Match(strVariable, @"Command Prefixes").Success)
+            else if (strVariable.Contains("Command Prefixes"))
             {
                 String[] strVariableArray = strVariable.Split(' ');
-                int cmdNum = Convert.ToInt32(strVariableArray[strVariableArray.Length - 1]);
+                int n = Convert.ToInt32(strVariableArray[strVariableArray.Length - 1]);
                 try
                 {
-                    if (commandList[cmdNum].GetType() != typeof(command) || commandList[cmdNum] == null)
-                        commandList[cmdNum] = new command(this, "", strValue, "");
-                    commandList[cmdNum].setPrefixes(strValue);
+                    if (commandList[n].GetType() != typeof(command) || commandList[n] == null)
+                        commandList[n] = new command(this, "", strValue, "", 1);
+                    commandList[n].prefixes = strValue;
                 }
                 catch (ArgumentOutOfRangeException e)
                 {
                     toConsole(3, e.ToString());
-                    commandList.Add(new command(this, "", strValue, ""));
-                    //commandList[cmdNum].setPrefixes(strValue);
+                    commandList.Add(new command(this, "", strValue, "", 1));
+                    //commandList[n].setPrefixes(strValue);
                 }
             }
-            else if (Regex.Match(strVariable, @"Command Response").Success)
+            else if (strVariable.Contains("Command Response"))
             {
                 String[] strVariableArray = strVariable.Split(' ');
-                int cmdNum = Convert.ToInt32(strVariableArray[strVariableArray.Length - 1]);
+                int n = Convert.ToInt32(strVariableArray[strVariableArray.Length - 1]);
                 try
                 {
-                    if (commandList[cmdNum].GetType() != typeof(command) || commandList[cmdNum] == null)
-                        commandList[cmdNum] = new command(this, "", "", strValue);
-                    commandList[cmdNum].setResponse(strValue);
+                    if (commandList[n].GetType() != typeof(command) || commandList[n] == null)
+                        commandList[n] = new command(this, "", "", strValue, 1);
+                    commandList[n].response = strValue;
                 }
                 catch (ArgumentOutOfRangeException e)
                 {
                     toConsole(3, e.ToString());
-                    commandList.Add(new command(this, "", "", strValue));
+                    commandList.Add(new command(this, "", "", strValue, 1));
                 }
             }
-            else if (Regex.Match(strVariable, @"Debug Level").Success)
+            else if (strVariable.Contains("Debug Level"))
             {
                 debugLevelString = strValue;
                 try
