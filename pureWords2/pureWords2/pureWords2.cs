@@ -6,7 +6,7 @@ using System.Reflection;
 using System.Collections.Generic;
 using System.Data;
 using System.Text.RegularExpressions;
-
+using System.Runtime.Serialization.Formatters.Binary;
 //Import Procon things.
 using PRoCon.Core;
 using PRoCon.Core.Plugin;
@@ -32,6 +32,7 @@ namespace PRoConEvents
 
         private List<command> commandList = new List<command>();
 
+        [Serializable]
         private class command
         {
             private string cmd = "";
@@ -112,6 +113,20 @@ namespace PRoConEvents
                 return false;
             }
         }
+
+        //Source: http://stackoverflow.com/questions/129389/how-do-you-do-a-deep-copy-an-object-in-net-c-specifically
+        public static T DeepClone<T>(T obj)
+        {
+            using (var ms = new MemoryStream())
+            {
+                var formatter = new BinaryFormatter();
+                formatter.Serialize(ms, obj);
+                ms.Position = 0;
+
+                return (T)formatter.Deserialize(ms);
+            }
+        }
+
         private string debugLevelString = "1";
         private int debugLevel = 1;
 
@@ -171,7 +186,7 @@ namespace PRoConEvents
 
         public string GetPluginVersion()
         {
-            return "0.5.3";
+            return "0.5.4";
         }
 
         public string GetPluginAuthor()
@@ -375,9 +390,7 @@ include customizable starting characters like '#' or '@'.</p>
 
         public String removeCReturn(String original)
         {
-            string replaceWith = "";
-            string noCReturn = original.Replace("\r", replaceWith);
-            return noCReturn;
+            return original.Replace("\r", "");
         }
 
         public void kickPlayer(String playerName)
@@ -534,11 +547,13 @@ include customizable starting characters like '#' or '@'.</p>
                     cmdToCopy = Int32.Parse(strValue);
 					if(cmdToCopy + 1 > commandList.Count)
 					{
-						toConsole(1, "ERROR: That command doesn't exist!")
+						toConsole(1, "ERROR: That command doesn't exist!");
 					}else{
 						//Need a better cloning function
-						commandList.Insert(cmdToCopy + 1, new command(this, commandList[cmdToCopy].getCommand(), commandList[cmdToCopy].getPrefixes(), commandList[cmdToCopy].getResponse());
-					}
+						//commandList.Insert(cmdToCopy + 1, new command(this, commandList[cmdToCopy].getCommand(), commandList[cmdToCopy].getPrefixes(), commandList[cmdToCopy].getResponse());
+                        commandList.Insert(cmdToCopy + 1, DeepClone(commandList[cmdToCopy]));				
+                    }
+
                 }
                 catch (Exception z)
                 {
