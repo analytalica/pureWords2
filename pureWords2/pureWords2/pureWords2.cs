@@ -32,14 +32,19 @@ namespace PRoConEvents
 
         private List<command> commandList = new List<command>();
 
-        [Serializable]
         private class command
         {
-            private string cmd = "";
+            //private string cmd = "";
+            public string cmd
+            {
+                get { return cmd; }
+                set { cmd = value.Trim().ToLower(); }
+            }
             private string response = "";
             private pureWords2 pw2 = null;
             //Default Prefixes
             private List<char> prefixesList = new List<char>(new char[] { '!', '/' });
+            private int broacastLevel = 1;
 
             public command()
             {
@@ -48,8 +53,9 @@ namespace PRoConEvents
                 pw2 = null;
                 //Default Prefixes
                 prefixesList = new List<char>(new char[] { '!','/' });
+                broacastLevel = 1;
             }
-            public command(pureWords2 instance, String cmdString, String prefixesString, String responseString)
+            public command(pureWords2 instance, String cmdString, String prefixesString, String responseString, int broadcast)
             {
                 pw2 = instance;
                 setCommand(cmdString);
@@ -63,14 +69,14 @@ namespace PRoConEvents
                     setPrefixes("!/");
                 }
             }
-            public void setCommand(String cmdString)
+            /*public void setCommand(String cmdString)
             {
                 cmd = cmdString.Trim().ToLower();
             }
             public String getCommand()
             {
                 return cmd;
-            }
+            }*/
             public void setPrefixes(String prefixString)
             {
                 pw2.toConsole(3, "DEBUG: Setting prefixes to " + prefixString);
@@ -94,6 +100,14 @@ namespace PRoConEvents
             {
                 return response;
             }
+            public void setBroadcast(int broadcast)
+            {
+                broacastLevel = broadcast;
+            }
+            public int getBroadcast()
+            {
+                return broacastLevel;
+            }
             public Boolean checkChatAndRespond(String playerName, String chatMsg)
             {
                 String message = chatMsg;
@@ -111,19 +125,6 @@ namespace PRoConEvents
                     }
                 }
                 return false;
-            }
-        }
-
-        //Source: http://stackoverflow.com/questions/129389/how-do-you-do-a-deep-copy-an-object-in-net-c-specifically
-        public static T DeepClone<T>(T obj)
-        {
-            using (var ms = new MemoryStream())
-            {
-                var formatter = new BinaryFormatter();
-                formatter.Serialize(ms, obj);
-                ms.Position = 0;
-
-                return (T)formatter.Deserialize(ms);
             }
         }
 
@@ -186,7 +187,7 @@ namespace PRoConEvents
 
         public string GetPluginVersion()
         {
-            return "0.5.4";
+            return "0.5.7";
         }
 
         public string GetPluginAuthor()
@@ -452,7 +453,7 @@ include customizable starting characters like '#' or '@'.</p>
                 lstReturn.Add(new CPluginVariable("Command Settings|New Command Word", typeof(string), ""));
 				
 				if(commandList.Count > 0){
-					lstReturn.Add(new CPluginVariable("Command Settings|Copy Existing Command", typeof(string), ""));
+					//lstReturn.Add(new CPluginVariable("Command Settings|Copy Existing Command", typeof(string), ""));
 				}
 
                 for (int i = 0; i < commandList.Count; i++)
@@ -551,16 +552,17 @@ include customizable starting characters like '#' or '@'.</p>
 					}else{
 						//Need a better cloning function
 						//commandList.Insert(cmdToCopy + 1, new command(this, commandList[cmdToCopy].getCommand(), commandList[cmdToCopy].getPrefixes(), commandList[cmdToCopy].getResponse());
-                        commandList.Insert(cmdToCopy + 1, DeepClone(commandList[cmdToCopy]));				
+                        //commandList.Insert(cmdToCopy + 1, DeepClone(commandList[cmdToCopy]));				
                     }
 
                 }
                 catch (Exception z)
                 {
                     toConsole(1, "ERROR: Invalid command ID! Use integer values only.");
+                    toConsole(2, z.ToString());
                 }
 			}
-            else if (Regex.Match(strVariable, @"Command Word").Success)
+            else if (strVariable.Contains("Command Word"))
             {
                 String[] strVariableArray = strVariable.Split(' ');
                 int cmdNum = Convert.ToInt32(strVariableArray[strVariableArray.Length - 1]);
