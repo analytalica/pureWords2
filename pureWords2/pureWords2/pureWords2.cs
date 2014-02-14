@@ -28,7 +28,6 @@ namespace PRoConEvents
 
         private string kickMessage = "";
         private string chatMessage = "";
-        private Boolean initialSet = false;
 
         private List<command> commandList = new List<command>();
 
@@ -68,10 +67,12 @@ namespace PRoConEvents
                     i_prefixes = new List<char>(value.ToCharArray());
                 }
             }
-
+            public int broadcastLevel
+            {
+                get;
+                set;
+            }
             private pureWords2 pw2 = null;
-            public int broacastLevel { get; set; }
-
             public command()
             {
                 commandWord = "";
@@ -79,13 +80,14 @@ namespace PRoConEvents
                 pw2 = null;
                 //Default Prefixes
                 prefixes = "!/";
-                broacastLevel = 1;
+                broadcastLevel = 1;
             }
             public command(pureWords2 instance, String cmdString, String prefixesString, String responseString, int broadcast)
             {
                 pw2 = instance;
                 commandWord = cmdString;
                 response = responseString;
+                broadcastLevel = broadcast;
                 if (!String.IsNullOrEmpty(prefixesString))
                 {
                     prefixes = prefixesString;
@@ -95,37 +97,6 @@ namespace PRoConEvents
                     prefixes = "!/";
                 }
             }
-            /*public void setCommand(String cmdString)
-            {
-                cmd = cmdString.Trim().ToLower();
-            }
-            public String getCommand()
-            {
-                return cmd;
-            }*/
-            /*public void setPrefixes(String prefixString)
-            {
-                pw2.toConsole(3, "DEBUG: Setting prefixes to " + prefixString);
-                prefixesList.Clear();
-                prefixesList = new List<char>(prefixString.ToCharArray());
-            }
-            public String getPrefixes()
-            {
-                String prefixesListString = "";
-                foreach (char c in prefixesList)
-                {
-                    prefixesListString += c.ToString();
-                }
-                return prefixesListString;
-            }
-            public void setResponse(String responseString)
-            {
-                response = responseString.Replace("\r", "").Trim();
-            }
-            public String getResponse()
-            {
-                return response;
-            }*/
             public Boolean checkChatAndRespond(String playerName, String chatMsg)
             {
                 String message = chatMsg;
@@ -135,9 +106,17 @@ namespace PRoConEvents
                     String cmdBody = message.Substring(1).ToLower();
                     foreach (char k in i_prefixes)
                     {
-                        if (message[0] == k && cmdBody == this.commandWord)
+                        if (message[0] == k && cmdBody == this.commandWord && this.broadcastLevel != 0)
                         {
-                            pw2.toChat(this.response, playerName);
+                            switch (this.broadcastLevel)
+                            {
+                                case 1:
+                                    pw2.toChat(this.response, playerName);
+                                    break;
+                                default:
+                                    pw2.toChat(this.response);
+                                    break;
+                            }
                             return true;
                         }
                     }
@@ -205,7 +184,7 @@ namespace PRoConEvents
 
         public string GetPluginVersion()
         {
-            return "0.6.3";
+            return "0.6.6";
         }
 
         public string GetPluginAuthor()
@@ -480,8 +459,9 @@ include customizable starting characters like '#' or '@'.</p>
                     String commandWordAdd = thisCommand.commandWord;
                     String prefixesAdd = thisCommand.prefixes;
                     String responseAdd = thisCommand.response;
+                    String broadcastAdd = thisCommand.broadcastLevel.ToString();
                     //Default prefixes
-                    if (String.IsNullOrEmpty(commandWordAdd) && String.IsNullOrEmpty(responseAdd) && (String.IsNullOrEmpty(prefixesAdd) || prefixesAdd == "!/") && initialSet == true)
+                    if (String.IsNullOrEmpty(commandWordAdd) && String.IsNullOrEmpty(responseAdd) && (String.IsNullOrEmpty(prefixesAdd) || prefixesAdd == "!/"))
                     {
                         commandList.Remove(thisCommand);
                         i--;
@@ -491,6 +471,7 @@ include customizable starting characters like '#' or '@'.</p>
                         lstReturn.Add(new CPluginVariable("Command Settings|Command Word " + i.ToString(), typeof(string), commandWordAdd));
                         lstReturn.Add(new CPluginVariable("Command Settings|Command Prefixes " + i.ToString(), typeof(string), prefixesAdd));
                         lstReturn.Add(new CPluginVariable("Command Settings|Command Response " + i.ToString(), typeof(string), responseAdd));
+                        lstReturn.Add(new CPluginVariable("Command Settings|Command Broadcast Level " + i.ToString(), typeof(string), broadcastAdd));
                     }
                 }
 
@@ -510,7 +491,6 @@ include customizable starting characters like '#' or '@'.</p>
 
         public void SetPluginVariable(String strVariable, String strValue)
         {
-            initialSet = true;
             toConsole(3, "DEBUG: Setting '" + strVariable + "' with value '" + strValue + "'");
             if (strVariable.Contains("Bad Word List"))
             {
@@ -628,6 +608,29 @@ include customizable starting characters like '#' or '@'.</p>
                     commandList.Add(new command(this, "", "", strValue, 1));
                 }
             }
+            else if (strVariable.Contains("Command Broadcast Level"))
+            {
+                String[] strVariableArray = strVariable.Split(' ');
+                int n = Convert.ToInt32(strVariableArray[strVariableArray.Length - 1]);
+                try
+                {
+                    int bc = Int32.Parse(strValue);
+                    /*if (commandList[n].GetType() != typeof(command) || commandList[n] == null)
+                        commandList[n] = new command(this, "", "", strValue, 1);*/
+                    commandList[n].broadcastLevel = bc;
+                }
+                catch (ArgumentOutOfRangeException e)
+                {
+                    toConsole(3, e.ToString());
+                    toConsole(2, "ERROR: You cannot set a broadcast level for a nonexistent command.");
+                    //commandList.Add(new command(this, "", "", strValue, 1));
+                }
+                catch (Exception e)
+                {
+                    toConsole(1, "ERROR: Invalid broadcast level! Use integer values only.");
+                    commandList[n].broadcastLevel = 1;
+                }
+            }
             else if (strVariable.Contains("Debug Level"))
             {
                 debugLevelString = strValue;
@@ -637,7 +640,7 @@ include customizable starting characters like '#' or '@'.</p>
                 }
                 catch (Exception z)
                 {
-                    toConsole(1, "Invalid debug level! Use integer values only.");
+                    toConsole(1, "ERROR: Invalid debug level! Use integer values only.");
                     debugLevel = 1;
                     debugLevelString = "1";
                 }
