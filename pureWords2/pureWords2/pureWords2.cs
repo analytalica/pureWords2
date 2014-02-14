@@ -49,7 +49,7 @@ namespace PRoConEvents
             }
 
             //Default Prefixes
-            private List<char> i_prefixes = new List<char>(new char[] { '!', '/' });
+            private List<char> i_prefixes = new List<char>(new char[] { '/', '!', '@', '#' });
             public string prefixes
             {
                 get
@@ -79,7 +79,7 @@ namespace PRoConEvents
                 response = "";
                 pw2 = null;
                 //Default Prefixes
-                prefixes = "!/";
+                prefixes = "/!@#";
                 broadcastLevel = 1;
             }
             public command(pureWords2 instance, String cmdString, String prefixesString, String responseString, int broadcast)
@@ -94,7 +94,8 @@ namespace PRoConEvents
                 }
                 else //Default Prefixes
                 {
-                    prefixes = "!/";
+                    pw2.toConsole(2, "Resetting prefixes...");
+                    prefixes = "/!@#";
                 }
             }
             public Boolean checkChatAndRespond(String playerName, String chatMsg)
@@ -184,7 +185,7 @@ namespace PRoConEvents
 
         public string GetPluginVersion()
         {
-            return "0.6.6";
+            return "0.7.0";
         }
 
         public string GetPluginAuthor()
@@ -447,7 +448,7 @@ include customizable starting characters like '#' or '@'.</p>
                 lstReturn.Add(new CPluginVariable("Filter Settings|Bad Word List", typeof(string), keywordListString));
                 lstReturn.Add(new CPluginVariable("Filter Settings|Kick Message", typeof(string), kickMessage));
                 lstReturn.Add(new CPluginVariable("Filter Settings|Admin Chat Message", typeof(string), chatMessage));
-                lstReturn.Add(new CPluginVariable("Command Settings|New Command Word", typeof(string), ""));
+                lstReturn.Add(new CPluginVariable("Command Settings|Create a New Command Word", typeof(string), ""));
 				
 				if(commandList.Count > 0){
 					//lstReturn.Add(new CPluginVariable("Command Settings|Copy Existing Command", typeof(string), ""));
@@ -461,17 +462,17 @@ include customizable starting characters like '#' or '@'.</p>
                     String responseAdd = thisCommand.response;
                     String broadcastAdd = thisCommand.broadcastLevel.ToString();
                     //Default prefixes
-                    if (String.IsNullOrEmpty(commandWordAdd) && String.IsNullOrEmpty(responseAdd) && (String.IsNullOrEmpty(prefixesAdd) || prefixesAdd == "!/"))
+                    if (String.IsNullOrEmpty(commandWordAdd) && String.IsNullOrEmpty(responseAdd) && (String.IsNullOrEmpty(prefixesAdd) || prefixesAdd == "/!@#"))
                     {
                         commandList.Remove(thisCommand);
                         i--;
                     }
                     else
                     {
-                        lstReturn.Add(new CPluginVariable("Command Settings|Command Word " + i.ToString(), typeof(string), commandWordAdd));
-                        lstReturn.Add(new CPluginVariable("Command Settings|Command Prefixes " + i.ToString(), typeof(string), prefixesAdd));
-                        lstReturn.Add(new CPluginVariable("Command Settings|Command Response " + i.ToString(), typeof(string), responseAdd));
-                        lstReturn.Add(new CPluginVariable("Command Settings|Command Broadcast Level " + i.ToString(), typeof(string), broadcastAdd));
+                        lstReturn.Add(new CPluginVariable("Command Settings|" + i.ToString() + ". Command Word", typeof(string), commandWordAdd));
+                        lstReturn.Add(new CPluginVariable("Command Settings|" + i.ToString() + ". Command Prefixes", typeof(string), prefixesAdd));
+                        lstReturn.Add(new CPluginVariable("Command Settings|" + i.ToString() + ". Command Response", typeof(string), responseAdd));
+                        lstReturn.Add(new CPluginVariable("Command Settings|" + i.ToString() + ". Command Broadcast Level", typeof(string), broadcastAdd));
                     }
                 }
 
@@ -487,6 +488,12 @@ include customizable starting characters like '#' or '@'.</p>
         public List<CPluginVariable> GetPluginVariables()
         {
             return GetDisplayPluginVariables();
+        }
+
+        public int getConfigIndex(string configString)
+        {
+            int lineLocation = configString.IndexOf('|');
+            return Int32.Parse(configString.Substring(lineLocation + 1, configString.IndexOf('.') - lineLocation - 1));
         }
 
         public void SetPluginVariable(String strVariable, String strValue)
@@ -561,8 +568,7 @@ include customizable starting characters like '#' or '@'.</p>
 			}
             else if (strVariable.Contains("Command Word"))
             {
-                String[] strVariableArray = strVariable.Split(' ');
-                int n = Convert.ToInt32(strVariableArray[strVariableArray.Length - 1]);
+                int n = getConfigIndex(strVariable);
                 try
                 {
                     if (commandList[n].GetType() != typeof(command) || commandList[n] == null)
@@ -577,8 +583,7 @@ include customizable starting characters like '#' or '@'.</p>
             }
             else if (strVariable.Contains("Command Prefixes"))
             {
-                String[] strVariableArray = strVariable.Split(' ');
-                int n = Convert.ToInt32(strVariableArray[strVariableArray.Length - 1]);
+                int n = getConfigIndex(strVariable);
                 try
                 {
                     if (commandList[n].GetType() != typeof(command) || commandList[n] == null)
@@ -594,8 +599,7 @@ include customizable starting characters like '#' or '@'.</p>
             }
             else if (strVariable.Contains("Command Response"))
             {
-                String[] strVariableArray = strVariable.Split(' ');
-                int n = Convert.ToInt32(strVariableArray[strVariableArray.Length - 1]);
+                int n = getConfigIndex(strVariable);
                 try
                 {
                     if (commandList[n].GetType() != typeof(command) || commandList[n] == null)
@@ -610,8 +614,7 @@ include customizable starting characters like '#' or '@'.</p>
             }
             else if (strVariable.Contains("Command Broadcast Level"))
             {
-                String[] strVariableArray = strVariable.Split(' ');
-                int n = Convert.ToInt32(strVariableArray[strVariableArray.Length - 1]);
+                int n = getConfigIndex(strVariable);
                 try
                 {
                     int bc = Int32.Parse(strValue);
