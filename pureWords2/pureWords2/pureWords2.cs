@@ -1,4 +1,4 @@
-﻿//Import various C# things.
+//Import various C# things.
 using System;
 using System.IO;
 using System.Text;
@@ -64,7 +64,15 @@ namespace PRoConEvents
                 set
                 {
                     i_prefixes.Clear();
-                    i_prefixes = new List<char>(value.ToCharArray());
+                    if (!String.IsNullOrEmpty(value))
+                    {
+                        i_prefixes = new List<char>(value.ToCharArray());
+                    }
+                    else //Default Prefixes
+                    {
+                        pw2.toConsole(2, "Resetting prefixes...");
+                        i_prefixes = new List<char>(new char[] { '/', '!', '@', '#' });
+                    }
                 }
             }
             public int broadcastLevel
@@ -78,8 +86,7 @@ namespace PRoConEvents
                 commandWord = "";
                 response = "";
                 pw2 = null;
-                //Default Prefixes
-                prefixes = "/!@#";
+                prefixes = "";
                 broadcastLevel = 1;
             }
             public command(pureWords2 instance, String cmdString, String prefixesString, String responseString, int broadcast)
@@ -88,15 +95,8 @@ namespace PRoConEvents
                 commandWord = cmdString;
                 response = responseString;
                 broadcastLevel = broadcast;
-                if (!String.IsNullOrEmpty(prefixesString))
-                {
-                    prefixes = prefixesString;
-                }
-                else //Default Prefixes
-                {
-                    pw2.toConsole(2, "Resetting prefixes...");
-                    prefixes = "/!@#";
-                }
+                prefixes = prefixesString;
+
             }
             public Boolean checkChatAndRespond(String playerName, String chatMsg)
             {
@@ -112,10 +112,10 @@ namespace PRoConEvents
                             switch (this.broadcastLevel)
                             {
                                 case 1:
-                                    pw2.toChat(this.response, playerName);
+                                    pw2.toChat(this.response.Replace("[player]", playerName), playerName);
                                     break;
                                 default:
-                                    pw2.toChat(this.response);
+                                    pw2.toChat(this.response.Replace("[player]", playerName));
                                     break;
                             }
                             return true;
@@ -185,7 +185,7 @@ namespace PRoConEvents
 
         public string GetPluginVersion()
         {
-            return "0.7.0";
+            return "0.7.8";
         }
 
         public string GetPluginAuthor()
@@ -200,33 +200,37 @@ namespace PRoConEvents
         #region Description
         public string GetPluginDescription()
         {
-            return @"<p><b>This version of pureWords that contains a special
-'lag' trigger. Open the settings tab for configuration options.
-</b> It can be disabled by clearing the 'Lag Response' field.
-Special notes:</p>
+            return @"<p><b>pureWords2</b> is a superior command, trigger, and filter plugin that can monitor and respond to in-game chat messages.<br>
 <ul>
-  <li><b>New in 1.7+: More information is contained in log entries.
-See below for details.</b></li>
-  <li>Add the timestamp to a log name by inserting [date] into
-the path. It will be replaced with MMddyyyy.</li>
-  <li>It is like any other trigger, but it also accepts messages.
-(By default) !lag, /lag, !lag message, /lag message will all work. </li>
-  <li>It logs like this:<br>
-<i>11/26/2013 19:58:57 [LAG REPORT] MP_Abandoned | ConquestLarge0 | Round
-Time : 153 | Server Uptime : 320 | Players : 1 | Analytalica : ''I had a
-dream that the PURE server would not lag... -Martin Luther King Jr''</i><br>
-in the time format 'MM/dd/yyyy HH:mm:ss</li>
-  <li>You can only report lag once per round.</li>
+  <li>Command Words: Set commands like '!help' or '@rules' that players can query through chat and get an automatic response to.</li>
+  <ul>
+    <li>Unlimited amount of prefixes, default '/!@#'</li>
+    <li>Configurable response broadcast level (to original speaker or all players)</li>
+    <li>Must be an exact match (prefix + command word only)</li>
+  </ul>
+  <li>Trigger Words: Set trigger words like 'hacks' that players will get an automatic response to.</li>
+  <ul>
+    <li>No prefixes - trigger words are discovered by a regex search</li>
+    <li>Configurable response broadcast level (to original speaker or all players)</li>
+    <li>Words are matched anywhere in a player chat message</li>
+  </ul>
+  <li>Bad Words: Set a list of bad words that players are kicked for saying.</li>
+  <ul>
+    <li>Configurable kick message received by player</li>
+  </ul>
+  <ul>
+    <li>Configurable server-wide chat response</li>
+    <li>Words are matched just like triggers</li>
+  </ul>
 </ul>
-<p>pureWords is a word filter plugin that monitors server chat.
-It features a configurable 'bad word' detector that kicks players for
-saying certain words in the in-game chat (whether it be global, team,
-or squad), and customizable chat triggers that respond to player
-inquiries such as '!help' or '/info'. Timestamped kick actions by
-pureWords can be logged into a local text file.
-</p>
-<p>This plugin was developed by analytalica for PURE Battlefield.</p>
-<p><big><b>Bad Word List Setup:</b></big><br>
+It is a massive overhaul and substantial upgrade to the original
+pureWords and is not a direct upgrade, hence the new name. Timestamped
+kick actions by
+pureWords can be logged into a local text file.</p>
+<p>This plugin was developed by Analytalica originally for PURE
+Battlefield.</p>
+<p><big><b>Bad Word List Setup (identical to
+pureWords):</b></big><br>
 </p>
 <ol>
   <li>Set the bad word list by separating individual keywords by
@@ -261,8 +265,7 @@ In the bad word list, leading and trailing spaces (as well as line
 breaks) are automatically removed,
 so it is fine to use <i>bathtub , porch ,bottle </i> in
 place of <i>bathtub,porch,bottle</i>.</p>
-<p><big><b>Trigger/Response
-Command Setup:</b></big></p>
+<p><big><b>Command Words Setup:</b></big></p>
 <ol>
   <li>Insert the command word (and only the word) into a trigger
 field.</li>
@@ -277,17 +280,14 @@ trigger is set to 'help', pureWords will respond if a player asks
 '!help' or '/help'. However, if the trigger is set to '!help',
 pureWords will only respond if a player asks '!!help' or '/!help'.</p>
 <p>Note that Battlefield has a hard restriction on the number of
-characters (roughly 126) that you can send per chat. It is fine to make
+characters (roughly 128) that you can send per chat. It is fine to make
 a response one line, but it will be cut off
 or may not display at all past the character limit. Instead, manually
 split the response into multiple lines (click the dropdown button in
 PRoCon next to the entry field) and they will be sent properly as
 multiple chat responses
 as opposed to one long continuous response.</p>
-<p>
-A future version of pureWords will automatically remove strings that
-begin with '!' and '/' in the trigger field to avoid confusion, and may
-include customizable starting characters like '#' or '@'.</p>
+
 
 ";
         }
@@ -295,7 +295,7 @@ include customizable starting characters like '#' or '@'.</p>
         //--------------------------------------
         //Helper Functions
         //--------------------------------------
-
+        #region Helper Functions
         public void toChat(String message)
         {
             if (!message.Contains("\n"))
@@ -396,7 +396,8 @@ include customizable starting characters like '#' or '@'.</p>
         {
             this.ExecuteCommand("procon.protected.send", "admin.kickPlayer", playerName, this.kickMessage);
         }
-        #region Chat Events
+        #endregion
+        #region Events
         public void OnPluginLoaded(string strHostName, string strPort, string strPRoConVersion)
         {
             this.RegisterEvents(this.GetType().Name, "OnPluginLoaded", "OnGlobalChat", "OnTeamChat", "OnSquadChat");
@@ -451,7 +452,7 @@ include customizable starting characters like '#' or '@'.</p>
                 lstReturn.Add(new CPluginVariable("Command Settings|Create a New Command Word", typeof(string), ""));
 				
 				if(commandList.Count > 0){
-					//lstReturn.Add(new CPluginVariable("Command Settings|Copy Existing Command", typeof(string), ""));
+					lstReturn.Add(new CPluginVariable("Command Settings|Copy Existing Command", typeof(string), ""));
 				}
 
                 for (int i = 0; i < commandList.Count; i++)
@@ -469,6 +470,7 @@ include customizable starting characters like '#' or '@'.</p>
                     }
                     else
                     {
+                        lstReturn.Add(new CPluginVariable("Command Settings|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~", typeof(string), "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"));
                         lstReturn.Add(new CPluginVariable("Command Settings|" + i.ToString() + ". Command Word", typeof(string), commandWordAdd));
                         lstReturn.Add(new CPluginVariable("Command Settings|" + i.ToString() + ". Command Prefixes", typeof(string), prefixesAdd));
                         lstReturn.Add(new CPluginVariable("Command Settings|" + i.ToString() + ". Command Response", typeof(string), responseAdd));
@@ -498,7 +500,7 @@ include customizable starting characters like '#' or '@'.</p>
 
         public void SetPluginVariable(String strVariable, String strValue)
         {
-            toConsole(3, "DEBUG: Setting '" + strVariable + "' with value '" + strValue + "'");
+            toConsole(3, "Setting '" + strVariable + "' with value '" + strValue + "'");
             if (strVariable.Contains("Bad Word List"))
             {
                 //keywordListString = strValue;
@@ -554,9 +556,10 @@ include customizable starting characters like '#' or '@'.</p>
 					{
 						toConsole(1, "ERROR: That command doesn't exist!");
 					}else{
-						//Need a better cloning function
-						//commandList.Insert(cmdToCopy + 1, new command(this, commandList[cmdToCopy].getCommand(), commandList[cmdToCopy].getPrefixes(), commandList[cmdToCopy].getResponse());
-                        //commandList.Insert(cmdToCopy + 1, DeepClone(commandList[cmdToCopy]));				
+                        String newCmd = "" + commandList[cmdToCopy].commandWord;
+                        String newPrefixes = "" + commandList[cmdToCopy].prefixes;
+                        String newResponse = "" + commandList[cmdToCopy].response;
+						commandList.Insert(cmdToCopy + 1, new command(this, newCmd, newPrefixes, newResponse, 1));
                     }
 
                 }
