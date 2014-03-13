@@ -22,14 +22,16 @@ namespace PRoConEvents
         //--------------------------------------
 
         private bool pluginEnabled = false;
+
+        //Bad words list stuff
+        private string kickMessage = "";
+        private string chatMessage = "";
         private string keywordListString = "";
         private string[] keywordArray;
         private int keywordArraySize = 0;
 
-        private string kickMessage = "";
-        private string chatMessage = "";
-
         private List<command> commandList = new List<command>();
+        private List<trigger> triggerList = new List<trigger>();
 
         private class command
         {
@@ -102,12 +104,12 @@ namespace PRoConEvents
             {
                 String message = chatMsg;
                 pw2.toConsole(3, "First character is " + message[0].ToString());
-                if (message.Trim().Length > 1 && !String.IsNullOrEmpty(this.response) && !String.IsNullOrEmpty(this.commandWord) && this.i_prefixes.Count > 0)
+                if (this.broadcastLevel > 0 && message.Trim().Length > 1 && !String.IsNullOrEmpty(this.response) && !String.IsNullOrEmpty(this.commandWord) && this.i_prefixes.Count > 0)
                 {
                     String cmdBody = message.Substring(1).ToLower();
                     foreach (char k in i_prefixes)
                     {
-                        if (message[0] == k && cmdBody == this.commandWord && this.broadcastLevel != 0)
+                        if (message[0] == k && cmdBody == this.commandWord)
                         {
                             switch (this.broadcastLevel)
                             {
@@ -121,6 +123,60 @@ namespace PRoConEvents
                             return true;
                         }
                     }
+                }
+                return false;
+            }
+        }
+
+        private class trigger
+        {
+            private string i_triggerWord = "";
+            public string triggerWord
+            {
+                get { return i_triggerWord; }
+                set { i_triggerWord = value.Trim().ToLower(); }
+            }
+            private string i_response = "";
+            public string response
+            {
+                get { return i_response; }
+                set { i_response = value.Replace("\r", "").Trim(); }
+            }
+            public int broadcastLevel
+            {
+                get;
+                set;
+            }
+            private pureWords2 pw2 = null;
+            public trigger()
+            {
+                triggerWord = "";
+                response = "";
+                pw2 = null;
+                broadcastLevel = 1;
+            }
+            public trigger(pureWords2 instance, String triggerString, String responseString, int broadcast)
+            {
+                pw2 = instance;
+                triggerWord = triggerString;
+                response = responseString;
+                broadcastLevel = broadcast;
+            }
+            public Boolean checkChatAndRespond(String playerName, String chatMsg)
+            {
+                String message = chatMsg;
+                if (Regex.IsMatch(message, "\\b" + this.triggerWord + "\\b", RegexOptions.IgnoreCase) && this.broadcastLevel != 0 && message.Trim().Length > 0 && !String.IsNullOrEmpty(this.response) && !String.IsNullOrEmpty(this.triggerWord))
+                {
+                    switch (this.broadcastLevel)
+                    {
+                        case 1:
+                            pw2.toChat(this.response.Replace("[player]", playerName), playerName);
+                            break;
+                        default:
+                            pw2.toChat(this.response.Replace("[player]", playerName));
+                            break;
+                    }
+                    return true;
                 }
                 return false;
             }
@@ -143,11 +199,9 @@ namespace PRoConEvents
                 toConsole(2, speaker + " just said: \"" + message + "\"");
                 if (containsBadWords(message))
                 {
-                    toConsole(1, "Kicking " + speaker + " with message \"" + kickMessage + "\"");
                     if (!String.IsNullOrEmpty(chatMessage))
                     {
-                        String chatThis = chatMessage.Replace("[player]", speaker);
-                        toConsole(2, "Sent to chat: \"" + chatThis + "\"");
+                        string chatThis = chatMessage.Replace("[player]", speaker);
                         toChat(chatThis);
                     }
                     kickPlayer(speaker);
@@ -185,7 +239,7 @@ namespace PRoConEvents
 
         public string GetPluginVersion()
         {
-            return "0.7.8";
+            return "0.9.9";
         }
 
         public string GetPluginAuthor()
@@ -200,21 +254,29 @@ namespace PRoConEvents
         #region Description
         public string GetPluginDescription()
         {
-            return @"<p><b>pureWords2</b> is a superior command, trigger, and filter plugin that can monitor and respond to in-game chat messages.<br>
+            return @"<p><b>pureWords2</b> is a superior command, trigger,
+and filter plugin that can monitor and respond to in-game chat messages.<br>
+</p>
 <ul>
-  <li>Command Words: Set commands like '!help' or '@rules' that players can query through chat and get an automatic response to.</li>
+  <li>Command Words: Set commands like '!help' or '@rules' that
+players can query through chat and get an automatic response to.</li>
   <ul>
     <li>Unlimited amount of prefixes, default '/!@#'</li>
-    <li>Configurable response broadcast level (to original speaker or all players)</li>
+    <li>Configurable response broadcast level (to original
+speaker or all players)</li>
     <li>Must be an exact match (prefix + command word only)</li>
   </ul>
-  <li>Trigger Words: Set trigger words like 'hacks' that players will get an automatic response to.</li>
+  <li>Trigger Words: Set trigger words like 'hacks' that players
+will get an automatic response to.</li>
   <ul>
-    <li>No prefixes - trigger words are discovered by a regex search</li>
-    <li>Configurable response broadcast level (to original speaker or all players)</li>
+    <li>No prefixes - trigger words are discovered by a regex
+search within the entire message</li>
+    <li>Configurable response broadcast level (to original
+speaker or all players)</li>
     <li>Words are matched anywhere in a player chat message</li>
   </ul>
-  <li>Bad Words: Set a list of bad words that players are kicked for saying.</li>
+  <li>Bad Words: Set a list of bad words that players are kicked
+for saying.</li>
   <ul>
     <li>Configurable kick message received by player</li>
   </ul>
@@ -223,14 +285,35 @@ namespace PRoConEvents
     <li>Words are matched just like triggers</li>
   </ul>
 </ul>
-It is a massive overhaul and substantial upgrade to the original
-pureWords and is not a direct upgrade, hence the new name. Timestamped
+<p>It is a massive overhaul and substantial upgrade to the original
+pureWords and is not a direct upgrade. 'Triggers' in the original
+pureWords are now known as 'Command Words' in pureWords2. Timestamped
 kick actions by
 pureWords can be logged into a local text file.</p>
 <p>This plugin was developed by Analytalica originally for PURE
 Battlefield.</p>
-<p><big><b>Bad Word List Setup (identical to
-pureWords):</b></big><br>
+<p><big><b>Command Words Setup:</b></big></p>
+<ol>
+  <li>Type a command word into 'Create a New Command Word'. Do
+not include prefixes here, like the '!' in '!test'.<br>
+    <i>test</i></li>
+  <li>Configure a response message. This is the message sent to
+chat in response.<br>
+    <i>test response</i></li>
+  <li>Configure any of the command's prefixes. The defaults are
+/!@#, split by individual characters.<br>
+    <i>/test, !test, @test,
+and #test</i></li>
+  <li>Set the broadcast level to 0 (disabled), 1 (original player
+only), or 2 (all players). The broadcast level dictates who receives
+the response message when the command word is entered.<br>
+  </li>
+</ol>
+<p>Command Words are matched by searching for any of the prefixes
+and then the word itself immediately after. In the example above in
+italics, a player who types '!test' in squad, team, or global chat will
+receive 'test response' in chat sent by the server.</p>
+<p><big><b>Bad Word List Setup:</b></big><br>
 </p>
 <ol>
   <li>Set the bad word list by separating individual keywords by
@@ -265,29 +348,28 @@ In the bad word list, leading and trailing spaces (as well as line
 breaks) are automatically removed,
 so it is fine to use <i>bathtub , porch ,bottle </i> in
 place of <i>bathtub,porch,bottle</i>.</p>
-<p><big><b>Command Words Setup:</b></big></p>
-<ol>
-  <li>Insert the command word (and only the word) into a trigger
-field.</li>
-  <li>Give a response to the corresponding trigger. This message
-is sent to the player who sent the command.</li>
-</ol>
-<p>pureWords will match chat messages that start with '!' or '/'
-and immediately after the
-trigger words and reply with the appropriate response. Do not use '!'
-or '/' inside the trigger field, use only the words themselves. If a
-trigger is set to 'help', pureWords will respond if a player asks
-'!help' or '/help'. However, if the trigger is set to '!help',
-pureWords will only respond if a player asks '!!help' or '/!help'.</p>
-<p>Note that Battlefield has a hard restriction on the number of
+<p><big><b>General Notes</b></big></p>
+<ul>
+  <li>All words and messages matched are case insensitive. The
+configuration page should prevent you from entering any capitalized
+letters.</li>
+  <li>Have a lot of similar commands or triggers? Use the 'Copy
+Existing Command' or 'Copy Existing Trigger' option by entering the
+number for the command or trigger you'd like to duplicate and it will
+appear underneath the original.</li>
+  <li>Clearing out most of the configuration fields for a command
+or trigger will automatically delete it.</li>
+  <li>Battlefield has a hard restriction on the number of
 characters (roughly 128) that you can send per chat. It is fine to make
 a response one line, but it will be cut off
 or may not display at all past the character limit. Instead, manually
 split the response into multiple lines (click the dropdown button in
 PRoCon next to the entry field) and they will be sent properly as
 multiple chat responses
-as opposed to one long continuous response.</p>
-
+as opposed to one long continuous response.</li>
+  <li>The bad word functionality is nearly identical to how it
+worked in the original pureWords.</li>
+</ul>
 
 ";
         }
@@ -296,13 +378,14 @@ as opposed to one long continuous response.</p>
         //Helper Functions
         //--------------------------------------
         #region Helper Functions
-        public void toChat(String message)
+        public void toChat(string message)
         {
-            if (!message.Contains("\n"))
+            if (!message.Contains("\n") && !String.IsNullOrEmpty(message))
             {
+                toConsole(2, "Sent to chat: \"" + message + "\"");
                 this.ExecuteCommand("procon.protected.send", "admin.say", message, "all");
             }
-            else
+            else if (message != "\n")
             {
                 string[] multiMsg = message.Split(new string[] { "\n" }, StringSplitOptions.None);
                 foreach (string send in multiMsg)
@@ -312,13 +395,14 @@ as opposed to one long continuous response.</p>
             }
         }
 
-        public void toChat(String message, String playerName)
+        public void toChat(string message, string playerName)
         {
-            if (!message.Contains("\n"))
+            if (!message.Contains("\n") && !String.IsNullOrEmpty(message))
             {
+                toConsole(2, "Sent to chat: \"" + message + "\" to " + playerName);
                 this.ExecuteCommand("procon.protected.send", "admin.say", message, "player", playerName);
             }
-            else
+            else if (message != "\n")
             {
                 string[] multiMsg = message.Split(new string[] { "\n" }, StringSplitOptions.None);
                 foreach (string send in multiMsg)
@@ -394,6 +478,7 @@ as opposed to one long continuous response.</p>
 
         public void kickPlayer(String playerName)
         {
+            toConsole(1, "Kicking " + playerName + " with message \"" + this.kickMessage + "\"");
             this.ExecuteCommand("procon.protected.send", "admin.kickPlayer", playerName, this.kickMessage);
         }
         #endregion
@@ -428,7 +513,7 @@ as opposed to one long continuous response.</p>
                 stringKeywordList += (keyword + ", ");
             }
             keywordArraySize = keywordArray.Length;
-            this.toConsole(2, "Keyword List (" + keywordArraySize + " words): " + stringKeywordList);
+            this.toConsole(2, "Bad Words List (" + keywordArraySize + " words): " + stringKeywordList);
             toLog("[STATUS] pureWords2 Enabled");
         }
 
@@ -444,15 +529,14 @@ as opposed to one long continuous response.</p>
             List<CPluginVariable> lstReturn = new List<CPluginVariable>();
             try
             {
-                lstReturn.Add(new CPluginVariable("Main Settings|Log Path", typeof(string), logName));
-                lstReturn.Add(new CPluginVariable("Main Settings|Debug Level", typeof(string), debugLevelString));
-                lstReturn.Add(new CPluginVariable("Filter Settings|Bad Word List", typeof(string), keywordListString));
-                lstReturn.Add(new CPluginVariable("Filter Settings|Kick Message", typeof(string), kickMessage));
-                lstReturn.Add(new CPluginVariable("Filter Settings|Admin Chat Message", typeof(string), chatMessage));
-                lstReturn.Add(new CPluginVariable("Command Settings|Create a New Command Word", typeof(string), ""));
+                lstReturn.Add(new CPluginVariable("1) Bad Word Settings|Bad Word List", typeof(string), keywordListString));
+                lstReturn.Add(new CPluginVariable("1) Bad Word Settings|Kick Message", typeof(string), kickMessage));
+                lstReturn.Add(new CPluginVariable("1) Bad Word Settings|Admin Chat Message", typeof(string), chatMessage));
+
+                lstReturn.Add(new CPluginVariable("2) Command Settings|Create a New Command Word", typeof(string), ""));
 				
 				if(commandList.Count > 0){
-					lstReturn.Add(new CPluginVariable("Command Settings|Copy Existing Command", typeof(string), ""));
+                    lstReturn.Add(new CPluginVariable("2) Command Settings|Copy Existing Command", typeof(string), ""));
 				}
 
                 for (int i = 0; i < commandList.Count; i++)
@@ -470,13 +554,44 @@ as opposed to one long continuous response.</p>
                     }
                     else
                     {
-                        lstReturn.Add(new CPluginVariable("Command Settings|~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~", typeof(string), "~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~"));
-                        lstReturn.Add(new CPluginVariable("Command Settings|" + i.ToString() + ". Command Word", typeof(string), commandWordAdd));
-                        lstReturn.Add(new CPluginVariable("Command Settings|" + i.ToString() + ". Command Prefixes", typeof(string), prefixesAdd));
-                        lstReturn.Add(new CPluginVariable("Command Settings|" + i.ToString() + ". Command Response", typeof(string), responseAdd));
-                        lstReturn.Add(new CPluginVariable("Command Settings|" + i.ToString() + ". Command Broadcast Level", typeof(string), broadcastAdd));
+                        //lstReturn.Add(new CPluginVariable("Command Settings|________________________________________________________________________________________________________________________________", typeof(string), "________________________________________________________________________________________________________________________________"));
+                        lstReturn.Add(new CPluginVariable("2) Command Settings|" + i.ToString() + ". Command Word ————————————————————————————————————————————————————————————————————————————————————————————————————————", typeof(string), commandWordAdd));
+                        lstReturn.Add(new CPluginVariable("2) Command Settings|" + i.ToString() + ". Command Prefixes", typeof(string), prefixesAdd));
+                        lstReturn.Add(new CPluginVariable("2) Command Settings|" + i.ToString() + ". Command Response", typeof(string), responseAdd));
+                        lstReturn.Add(new CPluginVariable("2) Command Settings|" + i.ToString() + ". Command Broadcast Level", typeof(string), broadcastAdd));
                     }
                 }
+
+                lstReturn.Add(new CPluginVariable("3) Trigger Settings|Create a New Trigger Word", typeof(string), ""));
+
+                if (triggerList.Count > 0)
+                {
+                    lstReturn.Add(new CPluginVariable("3) Trigger Settings|Copy Existing Trigger", typeof(string), ""));
+                }
+
+                for (int i = 0; i < triggerList.Count; i++)
+                {
+                    trigger thisTrigger = triggerList[i];
+                    String triggerWordAdd = thisTrigger.triggerWord;
+                    String responseAdd = thisTrigger.response;
+                    String broadcastAdd = thisTrigger.broadcastLevel.ToString();
+                    //Default prefixes
+                    if (String.IsNullOrEmpty(triggerWordAdd) && String.IsNullOrEmpty(responseAdd))
+                    {
+                        triggerList.Remove(thisTrigger);
+                        i--;
+                    }
+                    else
+                    {
+                        //lstReturn.Add(new CPluginVariable("Trigger Settings|________________________________________________________________________________________________________________________________", typeof(string), "________________________________________________________________________________________________________________________________"));
+                        lstReturn.Add(new CPluginVariable("3) Trigger Settings|" + i.ToString() + ". Trigger Word ————————————————————————————————————————————————————————————————————————————————————————————————————————", typeof(string), triggerWordAdd));
+                        lstReturn.Add(new CPluginVariable("3) Trigger Settings|" + i.ToString() + ". Trigger Response", typeof(string), responseAdd));
+                        lstReturn.Add(new CPluginVariable("3) Trigger Settings|" + i.ToString() + ". Trigger Broadcast Level", typeof(string), broadcastAdd));
+                    }
+                }
+
+                lstReturn.Add(new CPluginVariable("4) Main Settings|Log Path", typeof(string), logName));
+                lstReturn.Add(new CPluginVariable("4) Main Settings|Debug Level", typeof(string), debugLevelString));
 
             }
             catch (Exception e)
@@ -635,6 +750,87 @@ as opposed to one long continuous response.</p>
                 {
                     toConsole(1, "ERROR: Invalid broadcast level! Use integer values only.");
                     commandList[n].broadcastLevel = 1;
+                }
+            }
+            else if (strVariable.Contains("New Trigger Word"))
+            {
+                triggerList.Add(new trigger(this, strValue, "", 1));
+                //StreamWriter log = File.AppendText(logName);
+            }
+            else if (strVariable.Contains("Copy Existing Trigger"))
+            {
+                int tgrToCopy = 0;
+                try
+                {
+                    tgrToCopy = Int32.Parse(strValue);
+                    if (tgrToCopy + 1 > triggerList.Count)
+                    {
+                        toConsole(1, "ERROR: That trigger doesn't exist!");
+                    }
+                    else
+                    {
+                        String newTgr = "" + triggerList[tgrToCopy].triggerWord;
+                        String newResponse = "" + triggerList[tgrToCopy].response;
+                        triggerList.Insert(tgrToCopy + 1, new trigger(this, newTgr, newResponse, 1));
+                    }
+
+                }
+                catch (Exception z)
+                {
+                    toConsole(1, "ERROR: Invalid trigger ID! Use integer values only.");
+                    toConsole(2, z.ToString());
+                }
+            }
+            else if (strVariable.Contains("Trigger Word"))
+            {
+                int n = getConfigIndex(strVariable);
+                try
+                {
+                    if (triggerList[n].GetType() != typeof(trigger) || triggerList[n] == null)
+                        triggerList[n] = new trigger(this, strValue, "", 1);
+                    triggerList[n].triggerWord = strValue;
+                }
+                catch (ArgumentOutOfRangeException e)
+                {
+                    toConsole(3, e.ToString());
+                    triggerList.Add(new trigger(this, strValue, "", 1));
+                }
+            }
+            else if (strVariable.Contains("Trigger Response"))
+            {
+                int n = getConfigIndex(strVariable);
+                try
+                {
+                    if (triggerList[n].GetType() != typeof(trigger) || triggerList[n] == null)
+                        triggerList[n] = new trigger(this, "", strValue, 1);
+                    triggerList[n].response = strValue;
+                }
+                catch (ArgumentOutOfRangeException e)
+                {
+                    toConsole(3, e.ToString());
+                    triggerList.Add(new trigger(this, "", strValue, 1));
+                }
+            }
+            else if (strVariable.Contains("Trigger Broadcast Level"))
+            {
+                int n = getConfigIndex(strVariable);
+                try
+                {
+                    int bc = Int32.Parse(strValue);
+                    /*if (triggerList[n].GetType() != typeof(trigger) || triggerList[n] == null)
+                        triggerList[n] = new trigger(this, "", "", strValue, 1);*/
+                    triggerList[n].broadcastLevel = bc;
+                }
+                catch (ArgumentOutOfRangeException e)
+                {
+                    toConsole(3, e.ToString());
+                    toConsole(2, "ERROR: You cannot set a broadcast level for a nonexistent trigger.");
+                    //triggerList.Add(new trigger(this, "", "", strValue, 1));
+                }
+                catch (Exception e)
+                {
+                    toConsole(1, "ERROR: Invalid broadcast level! Use integer values only.");
+                    triggerList[n].broadcastLevel = 1;
                 }
             }
             else if (strVariable.Contains("Debug Level"))
