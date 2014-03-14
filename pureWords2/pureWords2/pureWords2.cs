@@ -115,12 +115,11 @@ namespace PRoConEvents
                             {
                                 case 1:
                                     pw2.toChat(this.response.Replace("[player]", playerName), playerName);
-                                    break;
+                                    return true;
                                 default:
                                     pw2.toChat(this.response.Replace("[player]", playerName));
-                                    break;
+                                    return true;
                             }
-                            return true;
                         }
                     }
                 }
@@ -165,18 +164,17 @@ namespace PRoConEvents
             public Boolean checkChatAndRespond(String playerName, String chatMsg)
             {
                 String message = chatMsg;
-                if (Regex.IsMatch(message, "\\b" + this.triggerWord + "\\b", RegexOptions.IgnoreCase) && this.broadcastLevel != 0 && message.Trim().Length > 0 && !String.IsNullOrEmpty(this.response) && !String.IsNullOrEmpty(this.triggerWord))
+                if (message.Trim().Length > 0 && this.broadcastLevel != 0 && !String.IsNullOrEmpty(this.response) && !String.IsNullOrEmpty(this.triggerWord) && Regex.IsMatch(message, "\\b" + this.triggerWord + "\\b", RegexOptions.IgnoreCase))
                 {
                     switch (this.broadcastLevel)
                     {
                         case 1:
                             pw2.toChat(this.response.Replace("[player]", playerName), playerName);
-                            break;
+                            return true;
                         default:
                             pw2.toChat(this.response.Replace("[player]", playerName));
-                            break;
+                            return true;
                     }
-                    return true;
                 }
                 return false;
             }
@@ -201,12 +199,12 @@ namespace PRoConEvents
                 {
                     if (!String.IsNullOrEmpty(chatMessage))
                     {
-                        string chatThis = chatMessage.Replace("[player]", speaker);
-                        toChat(chatThis);
+                        toChat(chatMessage.Replace("[player]", speaker));
                     }
                     kickPlayer(speaker);
                     toLog("[ACTION] " + speaker + " was kicked for saying \"" + message + "\"");
                 }
+                    //Ignore commands and triggers if the message contained a bad word.
                 else
                 {
                     toConsole(2, "No bad words...");
@@ -220,9 +218,17 @@ namespace PRoConEvents
                         }
                     }
                     if (!wasCommand)
-                    {
                         toConsole(2, "Was not a command...");
+                    Boolean wasTrigger = false;
+                    foreach (trigger aTgr in triggerList)
+                    {
+                        if (aTgr.checkChatAndRespond(speaker, message)){
+                            wasTrigger = true;
+                            break;
+                        }
                     }
+                    if (!wasTrigger)
+                        toConsole(2, "Was not a trigger...");
                 }
             }
         }
@@ -239,7 +245,7 @@ namespace PRoConEvents
 
         public string GetPluginVersion()
         {
-            return "0.9.9";
+            return "2.0.0";
         }
 
         public string GetPluginAuthor()
@@ -254,27 +260,11 @@ namespace PRoConEvents
         #region Description
         public string GetPluginDescription()
         {
-            return @"<p><b>pureWords2</b> is a superior command, trigger,
-and filter plugin that can monitor and respond to in-game chat messages.<br>
+            return @"<p><b>pureWords2</b> is a superior command,
+trigger,and filter plugin that can monitor and respond to in-game chat
+messages.<br>
 </p>
 <ul>
-  <li>Command Words: Set commands like '!help' or '@rules' that
-players can query through chat and get an automatic response to.</li>
-  <ul>
-    <li>Unlimited amount of prefixes, default '/!@#'</li>
-    <li>Configurable response broadcast level (to original
-speaker or all players)</li>
-    <li>Must be an exact match (prefix + command word only)</li>
-  </ul>
-  <li>Trigger Words: Set trigger words like 'hacks' that players
-will get an automatic response to.</li>
-  <ul>
-    <li>No prefixes - trigger words are discovered by a regex
-search within the entire message</li>
-    <li>Configurable response broadcast level (to original
-speaker or all players)</li>
-    <li>Words are matched anywhere in a player chat message</li>
-  </ul>
   <li>Bad Words: Set a list of bad words that players are kicked
 for saying.</li>
   <ul>
@@ -284,35 +274,33 @@ for saying.</li>
     <li>Configurable server-wide chat response</li>
     <li>Words are matched just like triggers</li>
   </ul>
+  <li>Command Words: Set commands like '!help' or '@rules' that
+players can query through chat and get an automatic response to.</li>
+  <ul>
+    <li>Unlimited amount of prefixes, default '/!@#'</li>
+    <li>Configurable response broadcast level (to original
+speaker or all players)</li>
+    <li>Must be an exact match (prefix + command word only)</li>
+  </ul>
+  <li>Trigger Words: Set trigger words like 'hacks' or 'aimbot'
+that players
+will get an automatic response to.</li>
+  <ul>
+    <li>No prefixes - trigger words are discovered by a regex
+search within the entire message</li>
+    <li>Configurable response broadcast level (to original
+speaker or all players)</li>
+    <li>Words are matched anywhere in a player chat message</li>
+  </ul>
 </ul>
-<p>It is a massive overhaul and substantial upgrade to the original
+<p>It is a massive overhaul and substantial upgrade to the
+original
 pureWords and is not a direct upgrade. 'Triggers' in the original
 pureWords are now known as 'Command Words' in pureWords2. Timestamped
 kick actions by
 pureWords can be logged into a local text file.</p>
 <p>This plugin was developed by Analytalica originally for PURE
 Battlefield.</p>
-<p><big><b>Command Words Setup:</b></big></p>
-<ol>
-  <li>Type a command word into 'Create a New Command Word'. Do
-not include prefixes here, like the '!' in '!test'.<br>
-    <i>test</i></li>
-  <li>Configure a response message. This is the message sent to
-chat in response.<br>
-    <i>test response</i></li>
-  <li>Configure any of the command's prefixes. The defaults are
-/!@#, split by individual characters.<br>
-    <i>/test, !test, @test,
-and #test</i></li>
-  <li>Set the broadcast level to 0 (disabled), 1 (original player
-only), or 2 (all players). The broadcast level dictates who receives
-the response message when the command word is entered.<br>
-  </li>
-</ol>
-<p>Command Words are matched by searching for any of the prefixes
-and then the word itself immediately after. In the example above in
-italics, a player who types '!test' in squad, team, or global chat will
-receive 'test response' in chat sent by the server.</p>
 <p><big><b>Bad Word List Setup:</b></big><br>
 </p>
 <ol>
@@ -340,7 +328,7 @@ format is <b>MM/dd/yyyy HH:mm:ss</b>.<br>
 If you wish to insert the daily timestamp into the log's filename, add
 [date] in the path.</li>
 </ol>
-<p>pureWords is case insensitive and matches whole words only
+<p>Bad Words are matched as&nbsp;whole words only
 (ignoring
 any punctuation),
 e.g. a player will not be kicked for 'ass' if he says 'assassin'.
@@ -348,25 +336,64 @@ In the bad word list, leading and trailing spaces (as well as line
 breaks) are automatically removed,
 so it is fine to use <i>bathtub , porch ,bottle </i> in
 place of <i>bathtub,porch,bottle</i>.</p>
+<p><big><b>Command Words Setup:</b></big></p>
+<ol>
+  <li>Type a command word into 'Create a New Command Word'. Do
+not include prefixes here, like the '!' in '!test'.<br>
+    <i>rules</i></li>
+  <li>Configure a response message. This is the message sent to
+chat in response. If used, [player] gets replaced by the sender.<br>
+    <i>Welcome [player]! No
+cheating.</i></li>
+  <li>Configure any of the command's prefixes. The defaults are
+/!@#, split by individual characters.<br>
+    <i>/rules, !rules, @rules,
+and #rules</i></li>
+  <li>Set the broadcast level to 0 (disabled), 1 (original player
+only), or 2 (all players). The broadcast level dictates who receives
+the response message when the command word is entered.<br>
+  </li>
+</ol>
+<p>Command Words are matched by searching for any of the prefixes
+and then the word itself immediately after. In the example above in
+italics, a player named Joe who types '!rules' in squad, team, or
+global chat will
+receive 'Welcome Joe! No cheating.' in chat sent by the server.</p>
+<p><big><b>Trigger Words Setup:</b></big></p>
+<ol>
+  <li>Type a trigger word into 'Create a New Command Word'.<br>
+    <i>hacker</i></li>
+  <li>Configure a response message. This is the message sent to
+chat in response. If used, [player] gets replaced by the sender.<br>
+    <i>Hey [player], please
+report hackers on our website.</i></li>
+  <li>Set the broadcast level to 0 (disabled), 1 (original player
+only), or 2 (all players). The broadcast level dictates who receives
+the response message when the command word is entered.<br>
+  </li>
+</ol>
+<p>Trigger Words are matched as whole words only (ignoring any punctuation), just like Bad Words. In the example above in
+italics, a player named Charlie who types 'Joe is a hacker!' in squad,
+team, or global chat will
+receive 'Hey Charlie, please report hackers on our website.' in chat
+sent by the server.</p>
 <p><big><b>General Notes</b></big></p>
 <ul>
   <li>All words and messages matched are case insensitive. The
 configuration page should prevent you from entering any capitalized
 letters.</li>
-  <li>Have a lot of similar commands or triggers? Use the 'Copy
+  <li>Use the 'Copy
 Existing Command' or 'Copy Existing Trigger' option by entering the
 number for the command or trigger you'd like to duplicate and it will
 appear underneath the original.</li>
   <li>Clearing out most of the configuration fields for a command
 or trigger will automatically delete it.</li>
-  <li>Battlefield has a hard restriction on the number of
-characters (roughly 128) that you can send per chat. It is fine to make
-a response one line, but it will be cut off
-or may not display at all past the character limit. Instead, manually
-split the response into multiple lines (click the dropdown button in
+  <li><b>Battlefield has a hard restriction on the number
+of
+characters (roughly 128) that you can send per chat.</b> Manually
+split responses into multiple lines (click the dropdown button in
 PRoCon next to the entry field) and they will be sent properly as
-multiple chat responses
-as opposed to one long continuous response.</li>
+multiple chat responses.</li>
   <li>The bad word functionality is nearly identical to how it
 worked in the original pureWords.</li>
 </ul>
@@ -383,6 +410,7 @@ worked in the original pureWords.</li>
             if (!message.Contains("\n") && !String.IsNullOrEmpty(message))
             {
                 toConsole(2, "Sent to chat: \"" + message + "\"");
+                exceeds128(message);
                 this.ExecuteCommand("procon.protected.send", "admin.say", message, "all");
             }
             else if (message != "\n")
@@ -400,6 +428,7 @@ worked in the original pureWords.</li>
             if (!message.Contains("\n") && !String.IsNullOrEmpty(message))
             {
                 toConsole(2, "Sent to chat: \"" + message + "\" to " + playerName);
+                exceeds128(message);
                 this.ExecuteCommand("procon.protected.send", "admin.say", message, "player", playerName);
             }
             else if (message != "\n")
@@ -410,6 +439,12 @@ worked in the original pureWords.</li>
                     toChat(send, playerName);
                 }
             }
+        }
+
+        public void exceeds128(string message)
+        {
+            if (message.Length > 128)
+                toConsole(1, "WARNING: Message \"" + message + "\" exceeds 128 characters and may not display properly in chat! Split messages into new lines <128 characters.");
         }
 
         public void toConsole(int msgLevel, String message)
@@ -530,8 +565,8 @@ worked in the original pureWords.</li>
             try
             {
                 lstReturn.Add(new CPluginVariable("1) Bad Word Settings|Bad Word List", typeof(string), keywordListString));
-                lstReturn.Add(new CPluginVariable("1) Bad Word Settings|Kick Message", typeof(string), kickMessage));
-                lstReturn.Add(new CPluginVariable("1) Bad Word Settings|Admin Chat Message", typeof(string), chatMessage));
+                lstReturn.Add(new CPluginVariable("1) Bad Word Settings|Kick Reason", typeof(string), kickMessage));
+                lstReturn.Add(new CPluginVariable("1) Bad Word Settings|Response Chat Message", typeof(string), chatMessage));
 
                 lstReturn.Add(new CPluginVariable("2) Command Settings|Create a New Command Word", typeof(string), ""));
 				
@@ -641,25 +676,26 @@ worked in the original pureWords.</li>
                     this.toConsole(1, "Keyword List Updated (" + keywordArraySize + " words): " + stringKeywordList);
                 }
             }
-            else if (strVariable.Contains("Kick Message"))
+            else if (strVariable.Contains("Kick Reason"))
             {
-                kickMessage = removeCReturn(strValue);
+                kickMessage = removeCReturn(strValue.Trim());
             }
-            else if (strVariable.Contains("Admin Chat Message"))
+            else if (strVariable.Contains("Response Chat Message"))
             {
-                chatMessage = removeCReturn(strValue);
+                chatMessage = removeCReturn(strValue.Trim());
             }
             else if (strVariable.Contains("Log Path"))
             {
-                logName = strValue.Trim();
+                string originalStrValue = strValue;
+                if (originalStrValue.StartsWith("\\") || originalStrValue.StartsWith("/"))
+                    originalStrValue = originalStrValue.Substring(1);
+                logName = originalStrValue.Trim().Replace('\\', '/');
                 if(pluginEnabled)
                     toLog("[STATUS] Log path set to " + logName);
-                //StreamWriter log = File.AppendText(logName);
             }
             else if (strVariable.Contains("New Command Word"))
             {
                 commandList.Add(new command(this, strValue, "", "", 1));
-                //StreamWriter log = File.AppendText(logName);
             }
 			else if (strVariable.Contains("Copy Existing Command"))
 			{
