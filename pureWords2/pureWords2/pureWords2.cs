@@ -3,6 +3,7 @@ using System;
 using System.IO;
 using System.Text;
 using System.Reflection;
+using System.Timers;
 using System.Collections.Generic;
 using System.Data;
 using System.Text.RegularExpressions;
@@ -11,6 +12,7 @@ using System.Runtime.Serialization.Formatters.Binary;
 using PRoCon.Core;
 using PRoCon.Core.Plugin;
 using PRoCon.Core.Players;
+using PRoCon.Core.Maps;
 
 namespace PRoConEvents
 {
@@ -22,6 +24,10 @@ namespace PRoConEvents
         //--------------------------------------
 
         private bool pluginEnabled = false;
+        private string debugLevelString = "1";
+        private int debugLevel = 1;
+
+        private string logName = "";
 
         //Bad words list stuff
         private string kickMessage = "";
@@ -32,6 +38,33 @@ namespace PRoConEvents
 
         private List<command> commandList = new List<command>();
         private List<trigger> triggerList = new List<trigger>();
+
+
+        //Supported RCON commands
+		private Timer rconTimer = new Timer();
+		private Queue<String> rconQueue = new Queue<String>();
+		
+		private Queue<rconAndTarget> nextMap = new Queue<rconAndTarget>();
+        private List<MaplistEntry> lstMaplist = new List<MaplistEntry>();
+        private int mapIndexNext = 0;
+
+        public void rconReset()
+        {
+            nextMap.Clear();
+            rconQueue.Clear();
+            lstMaplist.Clear();
+            mapIndexNext = 0;
+        }
+		
+		public bool rconSort (string message, string player){
+			if(message.Contains("[nextMap]")){
+                toConsole(2, "Message contains an RCON query " + "[nextMap]. Adding to queue...");
+				rconQueue.Enqueue("[nextMap]");
+				nextMap.Enqueue(new rconAndTarget("[nextMap]", message, player));
+				return true;
+            }
+			return false;
+		}
 
         private class command
         {
@@ -179,12 +212,44 @@ namespace PRoConEvents
                 return false;
             }
         }
+		
+		public class rconAndTarget
+		{
+			public string query { get; set; }
+			public string message { get; set; }
+			public string player { get; set; }
+			public rconAndTarget(){
+				this.query = "";
+				this.message = "";
+				this.player = "";
+			}
+			public rconAndTarget(string q, string m, string p){
+				this.query = q;
+				this.message = m;
+				this.player = p;
+			}
+		}
 
-        private string debugLevelString = "1";
-        private int debugLevel = 1;
-
-        private string logName = "";
-        //private StreamWriter log = File.AppendText("pureWordsLog.txt");
+        public void processRcon(object source, ElapsedEventArgs e)
+        {
+            if (pluginEnabled)
+            {
+                this.toConsole(4, "rconTimer Ticking... " + rconQueue.Count + " elements in queue.");
+                if (rconQueue.Count > 0)
+                {
+                    switch (rconQueue.Dequeue())
+                    {
+                        case "[nextMap]":
+                            this.toConsole(2, "Requesting next map info...");
+                            this.ExecuteCommand("procon.protected.send", "mapList.list", "0");
+                            this.ExecuteCommand("procon.protected.send", "mapList.getMapIndices");
+                            break;
+                        default:
+                            break;
+                    }
+                }
+            }
+        }
 
         public pureWords2()
         {
@@ -245,7 +310,7 @@ namespace PRoConEvents
 
         public string GetPluginVersion()
         {
-            return "2.0.0";
+            return "2.2.3";
         }
 
         public string GetPluginAuthor()
@@ -260,8 +325,9 @@ namespace PRoConEvents
         #region Description
         public string GetPluginDescription()
         {
-            return @"<p><b>pureWords2</b> is a superior command,
-trigger,and filter plugin that can monitor and respond to in-game chat
+            return @"<p><b>pureWords2</b> is a superior
+command,trigger,and filter plugin that can monitor and respond to
+in-game chat
 messages.<br>
 </p>
 <ul>
@@ -372,11 +438,25 @@ only), or 2 (all players). The broadcast level dictates who receives
 the response message when the command word is entered.<br>
   </li>
 </ol>
-<p>Trigger Words are matched as whole words only (ignoring any punctuation), just like Bad Words. In the example above in
+<p>Trigger Words are matched as whole words only (ignoring any
+punctuation), just like Bad Words. In the example above in
 italics, a player named Charlie who types 'Joe is a hacker!' in squad,
 team, or global chat will
 receive 'Hey Charlie, please report hackers on our website.' in chat
 sent by the server.</p>
+<p><big><b>Special Response Strings</b></big></p>
+<p>pureWords2 v2.2.0 has built the foundation for special
+response strings. By inserting a special response string, it is
+replaced by an always up-to-date dynamic response. Both Command and
+Trigger word responses can include special response strings.</p>
+<ul>
+  <li><b>[nextMap]</b> : Replaced with the next map.</li>
+  <li><b>[nextMode]</b> : Replaced with the next mode.</li>
+</ul>
+<p>Example: A 24/7 CQ Large Operation Locker server. Command word
+'nextmap' with response 'The next map is [nextMap] and the mode is
+[nextMode]' will respond to players with 'The next map is Operation
+Locker and the mode is Conquest Large'.</p>
 <p><big><b>General Notes</b></big></p>
 <ul>
   <li>All words and messages matched are case insensitive. The
@@ -397,7 +477,6 @@ multiple chat responses.</li>
   <li>The bad word functionality is nearly identical to how it
 worked in the original pureWords.</li>
 </ul>
-
 ";
         }
         #endregion
@@ -405,38 +484,36 @@ worked in the original pureWords.</li>
         //Helper Functions
         //--------------------------------------
         #region Helper Functions
-        public void toChat(string message)
+        public void toChat(String message)
         {
-            if (!message.Contains("\n") && !String.IsNullOrEmpty(message))
-            {
-                toConsole(2, "Sent to chat: \"" + message + "\"");
-                exceeds128(message);
-                this.ExecuteCommand("procon.protected.send", "admin.say", message, "all");
-            }
-            else if (message != "\n")
-            {
-                string[] multiMsg = message.Split(new string[] { "\n" }, StringSplitOptions.None);
-                foreach (string send in multiMsg)
-                {
-                    toChat(send);
-                }
-            }
+            toChat(message, "all");
         }
 
-        public void toChat(string message, string playerName)
+        public void toChat(String message, String playerName)
         {
-            if (!message.Contains("\n") && !String.IsNullOrEmpty(message))
+            if (!rconSort(message, playerName))
             {
-                toConsole(2, "Sent to chat: \"" + message + "\" to " + playerName);
-                exceeds128(message);
-                this.ExecuteCommand("procon.protected.send", "admin.say", message, "player", playerName);
-            }
-            else if (message != "\n")
-            {
-                string[] multiMsg = message.Split(new string[] { "\n" }, StringSplitOptions.None);
-                foreach (string send in multiMsg)
+                if (!message.Contains("\n") && !String.IsNullOrEmpty(message))
                 {
-                    toChat(send, playerName);
+                    if (playerName == "all")
+                    {
+                        this.toConsole(2, "Telling all players: '" + message + "'");
+                        this.ExecuteCommand("procon.protected.send", "admin.say", message, "all");
+                    }
+                    else
+                    {
+                        this.toConsole(2, "Telling " + playerName + " '" + message + "'");
+                        this.ExecuteCommand("procon.protected.send", "admin.say", message, "player", playerName);
+                    }
+                }
+                else if (message != "\n")
+                {
+                    string[] multiMsg = message.Split(new string[] { "\n" }, StringSplitOptions.None);
+                    foreach (string send in multiMsg)
+                    {
+                        if (!String.IsNullOrEmpty(message))
+                            toChat(send, playerName);
+                    }
                 }
             }
         }
@@ -520,7 +597,13 @@ worked in the original pureWords.</li>
         #region Events
         public void OnPluginLoaded(string strHostName, string strPort, string strPRoConVersion)
         {
-            this.RegisterEvents(this.GetType().Name, "OnPluginLoaded", "OnGlobalChat", "OnTeamChat", "OnSquadChat");
+            this.RegisterEvents(this.GetType().Name, "OnPluginLoaded", "OnGlobalChat", "OnTeamChat", "OnSquadChat", "OnMaplistList", "OnMaplistGetMapIndices", "OnRoundOver", "OnEndRound", "OnRunNextLevel");
+            this.rconTimer.Stop();
+            this.rconTimer = new Timer();
+            this.rconTimer.Elapsed += new ElapsedEventHandler(this.processRcon);
+            this.rconTimer.Interval = 500;
+            this.rconTimer.Start();
+            this.toConsole(2, "rconTimer enabled!");
         }
 
         public override void OnGlobalChat(string speaker, string message)
@@ -537,6 +620,85 @@ worked in the original pureWords.</li>
         {
             processChat(speaker, message.ToLower());
         }
+
+        public override void OnMaplistList(List<MaplistEntry> lstMaplist)
+        {
+            if (pluginEnabled)
+            {
+                this.toConsole(3, "OnMaplistList called.");
+                this.lstMaplist = lstMaplist;
+            }
+        }
+
+        public String realName(String MapFileName)
+        {
+            foreach (CMap map in this.GetMapDefines())
+            {
+                if (map.FileName == MapFileName)
+                {
+                    return map.PublicLevelName;
+                }
+            }
+            this.toConsole(1, "Something went wrong converting file name (" + MapFileName + ") to map name.");
+            return MapFileName;
+        }
+
+        public String realMode(MaplistEntry MEMap)
+        {
+            foreach (CMap map in this.GetMapDefines())
+            {
+                if (MEMap.Gamemode == map.PlayList && MEMap.MapFileName == map.FileName)
+                {
+                    return map.GameMode;
+                }
+            }
+            this.toConsole(1, "Something went wrong converting the GameMode name.");
+            return "Dinosaur Survival";
+        }
+
+        public override void OnMaplistGetMapIndices(int mapIndex, int nextIndex)
+        {
+            if (pluginEnabled)
+            {
+                this.toConsole(3, "OnMaplistGetMapIndices called.");
+                this.toConsole(3, "There are " + this.nextMap.Count + " people requesting the next map.");
+                this.mapIndexNext = nextIndex;
+                if (this.lstMaplist.Count < 1)
+                {
+                    this.toConsole(3, "Recalling [nextMap] commands, current map list is empty.");
+                    rconQueue.Enqueue("[nextMap]");
+                }
+                else
+                {
+                    this.toConsole(3, "Chatting to players requesting [nextMap]...");
+                    while (this.nextMap.Count > 0)
+                    {
+                        rconAndTarget wantNextMap = this.nextMap.Dequeue();
+                        string player = wantNextMap.player;
+                        string completeResponse = wantNextMap.message.Replace("[nextMap]", realName(lstMaplist[this.mapIndexNext].MapFileName)).Replace("[nextMode]", realMode(lstMaplist[this.mapIndexNext]));
+                        toChat(completeResponse, player);
+                    }
+                    this.toConsole(3, "[nextMap] chat queue cleared.");
+                }
+            }
+        }
+        #region Round End Events
+        public override void OnRoundOver(int winningTeamId) 
+        {
+            rconReset();
+        }
+
+        public override void OnEndRound(int iWinningTeamID) 
+        {
+            rconReset();
+        }
+
+        public override void OnRunNextLevel() 
+        {
+            rconReset();
+        }
+        #endregion
+
         #endregion
         public void OnPluginEnable()
         {
@@ -549,12 +711,21 @@ worked in the original pureWords.</li>
             }
             keywordArraySize = keywordArray.Length;
             this.toConsole(2, "Bad Words List (" + keywordArraySize + " words): " + stringKeywordList);
+            this.rconTimer.Stop();
+            this.rconTimer = new Timer();
+            this.rconTimer.Elapsed += new ElapsedEventHandler(this.processRcon);
+            this.rconTimer.Interval = 500;
+            this.rconTimer.Start();
+            this.toConsole(2, "rconTimer enabled!");
             toLog("[STATUS] pureWords2 Enabled");
         }
 
         public void OnPluginDisable()
         {
             this.pluginEnabled = false;
+            rconReset();
+            this.rconTimer.Stop();
+            this.toConsole(2, "rconTimer stopped!");
             toLog("[STATUS] pureWords2 Disabled");
             this.toConsole(1, "pureWords2 Disabled!");
         }
@@ -590,7 +761,7 @@ worked in the original pureWords.</li>
                     else
                     {
                         //lstReturn.Add(new CPluginVariable("Command Settings|________________________________________________________________________________________________________________________________", typeof(string), "________________________________________________________________________________________________________________________________"));
-                        lstReturn.Add(new CPluginVariable("2) Command Settings|" + i.ToString() + ". Command Word ————————————————————————————————————————————————————————————————————————————————————————————————————————", typeof(string), commandWordAdd));
+                        lstReturn.Add(new CPluginVariable("2) Command Settings|" + i.ToString() + ". Command Word       -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------", typeof(string), commandWordAdd));
                         lstReturn.Add(new CPluginVariable("2) Command Settings|" + i.ToString() + ". Command Prefixes", typeof(string), prefixesAdd));
                         lstReturn.Add(new CPluginVariable("2) Command Settings|" + i.ToString() + ". Command Response", typeof(string), responseAdd));
                         lstReturn.Add(new CPluginVariable("2) Command Settings|" + i.ToString() + ". Command Broadcast Level", typeof(string), broadcastAdd));
@@ -619,7 +790,7 @@ worked in the original pureWords.</li>
                     else
                     {
                         //lstReturn.Add(new CPluginVariable("Trigger Settings|________________________________________________________________________________________________________________________________", typeof(string), "________________________________________________________________________________________________________________________________"));
-                        lstReturn.Add(new CPluginVariable("3) Trigger Settings|" + i.ToString() + ". Trigger Word ————————————————————————————————————————————————————————————————————————————————————————————————————————", typeof(string), triggerWordAdd));
+                        lstReturn.Add(new CPluginVariable("3) Trigger Settings|" + i.ToString() + ". Trigger Word       -----------------------------------------------------------------------------------------------------------------------------------------------------------------------------", typeof(string), triggerWordAdd));
                         lstReturn.Add(new CPluginVariable("3) Trigger Settings|" + i.ToString() + ". Trigger Response", typeof(string), responseAdd));
                         lstReturn.Add(new CPluginVariable("3) Trigger Settings|" + i.ToString() + ". Trigger Broadcast Level", typeof(string), broadcastAdd));
                     }
