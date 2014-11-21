@@ -34,7 +34,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="PRoCon.Core">
-      <HintPath>..\..\..\..\..\..\Apps\Files\procon_1.4.0.9\PRoCon.Core.dll</HintPath>
+      <HintPath>..\..\..\PRoCon.Core.dll</HintPath>
     </Reference>
     <Reference Include="System" />
     <Reference Include="System.Core" />

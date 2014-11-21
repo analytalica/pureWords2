@@ -717,6 +717,7 @@ worked in the original pureWords.</li>
             this.rconTimer.Interval = 500;
             this.rconTimer.Start();
             this.toConsole(2, "rconTimer enabled!");
+            
             toLog("[STATUS] pureWords2 Enabled");
         }
 
